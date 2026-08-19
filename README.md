@@ -1,8 +1,8 @@
-# Runway
+# Wanderer
 
 A Game Boy–style browser game about the cost of not choosing.
 
-Runway is an interactive design-research prototype exploring how young people
+Wanderer is an interactive design-research prototype exploring how young people
 navigate options paralysis and fear-based decision-making during the transition
 into open-ended adult life. The core mechanic is **finitude**: you have a finite
 budget of weeks, spending is never refunded, and dithering is taxed — so the felt
@@ -44,7 +44,7 @@ sprites, no hard world boundaries, and deliberately simple turn-based task mecha
 
 ## Background
 
-Part of an independent design-research project ("Lost") studying identity development
+Part of an independent design-research project studying identity development
 and decision-making in the transition into college and adult life. Grounded in
 Acceptance & Commitment Therapy, Self-Determination Theory, Marcia's identity-status
 model, peak–end memory theory, and regret-asymmetry research.
