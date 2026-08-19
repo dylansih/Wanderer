@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>RUNWAY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  :root{ --p0:#e7e7dd; --p1:#9b9b90; --p2:#53534d; --p3:#1a1a17; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{ background:#0c0c0b; display:flex; align-items:center; justify-content:center;
+    min-height:100dvh; font-family:"Press Start 2P",monospace; color:var(--p3); padding:14px; }
+  #shell{ background:var(--p3); padding:14px 14px 16px; border-radius:14px;
+    box-shadow:0 0 0 2px #000, 0 24px 60px -20px #000; width:min(94vw,760px); }
+  #screen{ position:relative; width:100%; aspect-ratio:256/224; background:var(--p0);
+    overflow:hidden; border:3px solid #000; image-rendering:pixelated; }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; display:block; }
+
+  .label{ position:absolute; transform:translate(-50%,-50%); font-size:clamp(5px,1.15vw,8px);
+    color:var(--p3); background:var(--p0); padding:2px 4px; border:2px solid var(--p3);
+    white-space:nowrap; pointer-events:none; z-index:5; line-height:1; }
+  .label.door{ background:var(--p3); color:var(--p0); }
+  .label.hide{ display:none; }
+
+  .panel{ position:absolute; z-index:20; background:var(--p0); border:3px solid var(--p3);
+    box-shadow:0 0 0 3px var(--p0), 0 0 0 5px var(--p3); }
+
+  #hud{ top:6px; left:6px; right:6px; display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px; z-index:15; background:var(--p0); border:3px solid var(--p3); }
+  #hud .time{ font-size:clamp(6px,1.4vw,9px); } #hud .k{ opacity:.7; }
+  #taskHud{ top:6px; left:6px; right:6px; display:none; padding:6px 8px; z-index:15;
+    background:var(--p3); color:var(--p0); font-size:clamp(6px,1.35vw,9px); text-align:center; }
+
+  #dialogue{ left:6px; right:6px; bottom:6px; padding:9px 11px 11px; z-index:25; display:none; }
+  #dlgName{ display:inline-block; font-size:clamp(6px,1.4vw,9px); background:var(--p3); color:var(--p0);
+    padding:3px 6px; margin-bottom:8px; }
+  #dlgText{ font-size:clamp(6px,1.35vw,9px); line-height:1.8; min-height:3.4em; }
+  #dlgChoices{ display:flex; flex-direction:column; gap:5px; margin-top:9px; }
+  #dlgChoices .ch{ font-size:clamp(6px,1.3vw,9px); padding:3px 4px; color:var(--p2); }
+  #dlgChoices .ch.sel{ color:var(--p3); background:var(--p1); }
+  #dlgChoices .ch.dis{ opacity:.4; }
+  #dlgHint{ margin-top:8px; font-size:clamp(5px,1.1vw,7px); color:var(--p1); text-align:right; }
+
+  .modal{ inset:6px; z-index:30; display:none; padding:14px; overflow:auto; }
+  .modal h2{ font-size:clamp(7px,1.6vw,11px); margin-bottom:12px; line-height:1.5; }
+  .modal p{ font-size:clamp(6px,1.3vw,9px); line-height:1.9; color:var(--p2); }
+  .modal .hint{ margin-top:14px; font-size:clamp(5px,1.1vw,7px); color:var(--p1); }
+
+  #builderWrap{ position:absolute; inset:6px; z-index:30; display:none; flex-direction:column;
+    padding:12px; background:var(--p0); border:3px solid var(--p3); }
+  #builderWrap h2{ font-size:clamp(7px,1.6vw,11px); text-align:center; margin-bottom:8px; }
+  #bCanvasCell{ flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #bCanvas{ image-rendering:pixelated; height:clamp(90px,22vw,150px); width:auto; border:2px solid var(--p3); background:var(--p1); }
+  .selector{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0; }
+  .selector .k{ font-size:clamp(6px,1.3vw,9px); } .selector .v{ font-size:clamp(6px,1.3vw,9px); color:var(--p2); flex:1; text-align:center; }
+  .arrow{ font-family:inherit; cursor:pointer; background:var(--p3); color:var(--p0); border:none; padding:5px 9px; font-size:clamp(7px,1.4vw,10px); }
+  .arrow:hover{ background:var(--p2); }
+  .btn{ font-family:inherit; cursor:pointer; font-size:clamp(6px,1.3vw,9px); background:var(--p0); color:var(--p3); border:2px solid var(--p3); padding:6px 9px; }
+  .btn:hover{ background:var(--p3); color:var(--p0); }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; justify-content:center; }
+
+  #invGrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-top:4px; }
+  .slot{ aspect-ratio:1; background:var(--p0); border:2px solid var(--p3); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:4px; gap:3px; }
+  .slot.empty{ border-style:dashed; border-color:var(--p1); } .slot.sel{ background:var(--p1); }
+  .slot canvas{ image-rendering:pixelated; width:34px; height:34px; }
+  .slot .nm{ font-size:clamp(4px,0.95vw,6px); text-align:center; line-height:1.3; color:var(--p2); }
+  .sect{ margin-top:12px; }
+  .sect h3{ font-size:clamp(6px,1.3vw,9px); color:var(--p3); background:var(--p1); padding:4px 6px; margin-bottom:6px; }
+  .sect ul{ list-style:none; } .sect li{ font-size:clamp(5px,1.2vw,8px); line-height:1.9; color:var(--p2); padding-left:12px; position:relative; }
+  .sect li::before{ content:"+"; position:absolute; left:0; color:var(--p3); }
+
+  #pause{ inset:40px 30px; z-index:38; display:none; padding:16px; text-align:center; }
+  #pause h2{ font-size:clamp(8px,1.8vw,12px); margin-bottom:16px; }
+  #pause .pm{ font-size:clamp(7px,1.5vw,10px); padding:8px; color:var(--p2); } #pause .pm.sel{ color:var(--p3); background:var(--p1); }
+
+  /* task overlays */
+  .task{ inset:6px; z-index:34; display:none; padding:12px; flex-direction:column; }
+  .task h2{ font-size:clamp(7px,1.5vw,10px); margin-bottom:8px; }
+  .task .tcanvasCell{ flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+  .task canvas{ image-rendering:pixelated; width:100%; height:auto; max-height:100%; border:2px solid var(--p3); background:var(--p0); }
+  .task .thint{ margin-top:8px; font-size:clamp(5px,1.1vw,7px); color:var(--p1); text-align:center; line-height:1.7; }
+
+  #fade{ position:absolute; inset:0; z-index:50; background:#000; opacity:0; pointer-events:none; transition:opacity .55s ease; }
+  #fade.on{ opacity:1; }
+  #sndBtn{ position:absolute; bottom:6px; left:6px; z-index:16; font-family:inherit; cursor:pointer; font-size:6px; background:var(--p3); color:var(--p0); border:none; padding:4px 5px; opacity:.7; }
+  #hintbar{ position:absolute; bottom:-13px; left:0; right:0; text-align:center; font-size:clamp(5px,1.1vw,7px); color:var(--p1); }
+</style>
+</head>
+<body>
+  <div id="shell">
+    <div id="screen">
+      <canvas id="game" width="256" height="224"></canvas>
+      <div id="labels"></div>
+
+      <div id="hud" class="panel" style="display:none">
+        <span class="time"><span class="k">TIME</span> <span id="hudTime">120</span> wks</span>
+        <span class="time"><span class="k">B</span> bag &nbsp; <span class="k">ESC</span> menu</span>
+      </div>
+      <div id="taskHud" class="panel"></div>
+
+      <div id="dialogue" class="panel">
+        <span id="dlgName">VENDOR</span>
+        <div id="dlgText"></div>
+        <div id="dlgChoices"></div>
+        <div id="dlgHint">▸ space</div>
+      </div>
+
+      <div id="intro" class="modal panel">
+        <h2 id="introTitle">A PIVOTAL POINT</h2>
+        <p id="introBody"></p>
+        <div class="hint">▸ press space</div>
+      </div>
+
+      <div id="inventory" class="modal panel">
+        <h2>YOUR BAG</h2><div id="invGrid"></div>
+        <div class="hint">WASD move · SPACE open · B/ESC close</div>
+      </div>
+      <div id="detail" class="modal panel">
+        <h2 id="detName">ITEM</h2><p id="detDesc"></p><div id="detSections"></div>
+        <div class="hint">▸ space / esc to go back</div>
+      </div>
+
+      <div id="pause" class="modal panel">
+        <h2>PAUSED</h2>
+        <div class="pm" data-i="0">RESUME</div>
+        <div class="pm" data-i="1">RESTART GAME</div>
+        <div class="hint">WASD move · SPACE select</div>
+      </div>
+
+      <!-- task overlays -->
+      <div id="seq" class="task panel">
+        <h2 id="seqTitle">MAKE A BEAT</h2>
+        <div class="tcanvasCell"><canvas id="seqCanvas" width="220" height="130"></canvas></div>
+        <div class="thint">WASD move · SPACE toggle · P play/stop · ENTER lock the groove</div>
+      </div>
+      <div id="mix" class="task panel">
+        <h2 id="mixTitle">GET THE MIX TO SIT</h2>
+        <div class="tcanvasCell"><canvas id="mixCanvas" width="220" height="130"></canvas></div>
+        <div class="thint">W/S pick channel · A/D set level · P play · ENTER when it sits right</div>
+      </div>
+      <div id="acc" class="task panel">
+        <h2 id="accTitle">THE LONG QUESTION</h2>
+        <div class="tcanvasCell"><canvas id="accCanvas" width="220" height="130"></canvas></div>
+        <div class="thint" id="accHint">SPACE run a trial · P publish when the data is ready</div>
+      </div>
+
+      <div id="builderWrap">
+        <h2>CREATE YOURSELF</h2>
+        <div id="bCanvasCell"><canvas id="bCanvas" width="64" height="64"></canvas></div>
+        <div class="selector"><button class="arrow" data-k="gender" data-d="-1">◀</button>
+          <span class="k">BODY</span><span class="v" id="vGender">man</span>
+          <button class="arrow" data-k="gender" data-d="1">▶</button></div>
+        <div class="selector"><button class="arrow" data-k="outfit" data-d="-1">◀</button>
+          <span class="k">FIT</span><span class="v" id="vOutfit">t-shirt & shorts</span>
+          <button class="arrow" data-k="outfit" data-d="1">▶</button></div>
+        <div class="row"><button class="btn" id="builderOk" style="font-size:clamp(7px,1.5vw,10px)">▸ THIS IS ME</button></div>
+      </div>
+
+      <button id="sndBtn">♪ ON</button>
+      <div id="fade"></div>
+    </div>
+    <div id="hintbar">WASD move &nbsp;·&nbsp; SPACE to interact</div>
+  </div>
+
+<script>
+/* ============ RUNWAY — pass 3: enterable buildings + playable tasks ============ */
+const P0="#e7e7dd",P1="#9b9b90",P2="#53534d",P3="#1a1a17";
+const cv=document.getElementById("game"), cx=cv.getContext("2d"); cx.imageSmoothingEnabled=false;
+const VW=256, VH=224, HALF=8;
+const el=id=>document.getElementById(id);
+
+/* ---------- audio ---------- */
+let sndOn=true, actx=null;
+function AC(){ actx=actx||new(window.AudioContext||window.webkitAudioContext)(); return actx; }
+function blip(f,dur=0.08,type="square",vol=0.05,to=null){
+  if(!sndOn)return;
+  try{ const a=AC(),o=a.createOscillator(),g=a.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,a.currentTime);
+    if(to)o.frequency.linearRampToValueAtTime(to,a.currentTime+dur);
+    g.gain.value=vol;o.connect(g);g.connect(a.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+dur);o.stop(a.currentTime+dur+0.02);
+  }catch(e){}
+}
+function noiseHit(dur=0.06,vol=0.05){
+  if(!sndOn)return;
+  try{ const a=AC(); const n=a.createBufferSource(); const b=a.createBuffer(1,a.sampleRate*dur,a.sampleRate);
+    const d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+    n.buffer=b; const g=a.createGain(); g.gain.value=vol; n.connect(g); g.connect(a.destination);
+    n.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+dur); n.stop(a.currentTime+dur+0.02);
+  }catch(e){}
+}
+const sfx={
+  select:()=>blip(520,0.05), confirm:()=>{blip(440,0.06);setTimeout(()=>blip(660,0.09),60);},
+  buy:()=>{blip(523,0.06);setTimeout(()=>blip(659,0.06),70);setTimeout(()=>blip(784,0.12),140);},
+  deny:()=>blip(150,0.16,"sawtooth"),
+  commit:()=>[392,523,659,784].forEach((f,i)=>setTimeout(()=>blip(f,0.16),i*110)),
+  door:()=>blip(330,0.12,"square",0.04,180), step:()=>blip(700,0.008,"square",0.012),
+  good:()=>{blip(660,0.06);setTimeout(()=>blip(880,0.1),70);}, bad:()=>blip(120,0.2,"sawtooth"),
+  kick:()=>blip(95,0.15,"sine",0.09,55), snare:()=>{noiseHit(0.08,0.05);blip(180,0.06,"triangle",0.03);},
+  hat:()=>noiseHit(0.03,0.03), heal:()=>{blip(500,0.05);setTimeout(()=>blip(720,0.08),50);}, crash:()=>blip(90,0.4,"sawtooth",0.06,40)
+};
+el("sndBtn").onclick=e=>{sndOn=!sndOn;e.target.textContent=sndOn?"♪ ON":"♪ OFF";};
+
+/* ================= SPRITES ================= */
+function drawChar(ctx,ox,oy,o){
+  const flip=o.dir==="right", dir=flip?"left":o.dir, f=o.frame||0;
+  const put=(x,y,w,h,c)=>{const X=flip?(16-(x+w)):x;ctx.fillStyle=c;ctx.fillRect(ox+X,oy+y,w,h);};
+  const SKIN=P0,HAIR=P3,CLOTH=P2,DARK=P3;
+  ctx.fillStyle=P1;ctx.fillRect(ox+4,oy+15,8,1);
+  if(dir==="down"||dir==="up"){
+    put(5,2,6,4,SKIN); put(4,1,8,2,HAIR);
+    if(o.gender==="man"){put(4,3,1,1,HAIR);put(11,3,1,1,HAIR);}
+    if(o.gender==="other"){put(4,3,1,3,HAIR);put(11,3,1,3,HAIR);}
+    if(o.gender==="woman"){put(4,3,1,5,HAIR);put(11,3,1,5,HAIR);}
+    if(dir==="up"){put(5,2,6,3,HAIR);} else {put(5,2,6,1,HAIR);put(6,4,1,1,DARK);put(9,4,1,1,DARK);}
+    put(5,6,6,4,CLOTH); put(4,6,1,3,SKIN);put(11,6,1,3,SKIN);put(4,9,1,1,SKIN);put(11,9,1,1,SKIN);
+    if(o.outfit==="dress"){ put(5,10,6,1,CLOTH);put(4,11,8,1,CLOTH);put(4,12,8,1,CLOTH);
+      put(5,13,2,1,SKIN);put(9,13,2,1,SKIN);put(5,14,2,1,DARK);put(9,14,2,1,DARK);
+    }else{ put(5,10,6,2,DARK);put(5,12,2,2,SKIN);put(9,12,2,2,SKIN);
+      put(5,14,2,1,DARK);put(9,14,2,1,DARK); if(f)put(5,13,2,1,SKIN); }
+  }else{
+    put(6,2,5,4,SKIN);put(6,1,5,2,HAIR);put(9,3,2,3,HAIR);
+    if(o.gender==="woman")put(9,3,2,5,HAIR); if(o.gender==="other")put(9,3,2,4,HAIR);
+    put(6,4,1,1,DARK); put(6,6,4,4,CLOTH);
+    if(f)put(6,7,1,3,SKIN);else put(9,7,1,3,SKIN);
+    if(o.outfit==="dress"){ put(6,10,4,1,CLOTH);put(5,11,5,2,CLOTH);
+      if(f){put(6,13,2,1,SKIN);put(6,14,2,1,DARK);}else{put(8,13,2,1,SKIN);put(8,14,2,1,DARK);}
+    }else{ put(6,10,4,2,DARK);
+      if(f){put(6,12,2,2,SKIN);put(6,14,2,1,DARK);put(8,12,2,2,SKIN);}
+      else{put(8,12,2,2,SKIN);put(8,14,2,1,DARK);put(6,12,2,2,SKIN);} }
+  }
+}
+function drawIcon(ctx,rung){
+  ctx.clearRect(0,0,16,16); const put=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x,y,w,h);};
+  if(rung===0){ put(3,7,10,3,P3);put(6,6,4,5,P0);put(7,7,2,3,P3); }
+  else if(rung===1){ put(6,2,4,1,P3);put(7,3,2,3,P2);put(4,6,8,7,P2);put(4,12,8,2,P3);put(6,9,1,1,P0); }
+  else if(rung===2){ put(7,2,2,3,P3);put(4,5,8,5,P2);put(6,10,4,3,P3);put(7,6,2,2,P0); }
+  else { put(3,3,10,2,P3);put(3,11,10,2,P3);put(4,5,8,6,P0);put(5,7,6,1,P2);put(5,9,6,1,P2);put(3,3,2,10,P3);put(11,3,2,10,P3); }
+}
+/* plaza props */
+function drawStall(sx,sy){
+  for(let i=0;i<48;i+=6){ cx.fillStyle=(i/6)%2===0?P3:P2; cx.fillRect(sx+i,sy,6,7); }
+  cx.fillStyle=P3;cx.fillRect(sx,sy+7,48,1);
+  cx.fillStyle=P2;cx.fillRect(sx,sy+8,2,24);cx.fillRect(sx+46,sy+8,2,24);
+  cx.fillStyle=P1;cx.fillRect(sx+2,sy+26,44,6);cx.fillStyle=P3;cx.fillRect(sx+2,sy+26,44,1);
+}
+function drawSign(sx,sy,tall){ const h=tall?12:10;
+  cx.fillStyle=P3;cx.fillRect(sx+3,sy,2,16); cx.fillStyle=P2;cx.fillRect(sx-4,sy-2,16,h);
+  cx.fillStyle=P3;cx.fillRect(sx-4,sy-2,16,1);cx.fillRect(sx-4,sy-3+h,16,1);
+  cx.fillStyle=P0;cx.fillRect(sx-2,sy,3,1);cx.fillRect(sx-2,sy+3,8,1);cx.fillRect(sx-2,sy+6,6,1); }
+function drawFlag(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx+2,sy,2,16); cx.fillStyle=P2;cx.fillRect(sx+4,sy,10,7);cx.fillStyle=P3;cx.fillRect(sx+4,sy,10,1); }
+function drawTree(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx+6,sy+12,3,6); cx.fillStyle=P2;cx.fillRect(sx+2,sy,11,13);
+  cx.fillStyle=P1;cx.fillRect(sx+4,sy+2,3,3);cx.fillRect(sx+8,sy+6,3,3); cx.fillStyle=P3;cx.fillRect(sx+2,sy,11,1);cx.fillRect(sx+2,sy+12,11,1); }
+function drawDoorProp(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx,sy,20,34); cx.fillStyle=P2;cx.fillRect(sx+2,sy+2,16,30);
+  cx.fillStyle=P0;cx.fillRect(sx+4,sy+4,12,26); cx.fillStyle=P3;cx.fillRect(sx+12,sy+16,3,3); }
+function drawBuilding(sx,sy,rung){
+  // building grows with rung. base 40 wide; taller with rung
+  const h=24+rung*6, w=40;
+  cx.fillStyle=P2; cx.fillRect(sx,sy-h,w,h);
+  cx.fillStyle=P3; cx.fillRect(sx,sy-h,w,1); cx.fillRect(sx,sy-1,w,1); cx.fillRect(sx,sy-h,1,h); cx.fillRect(sx+w-1,sy-h,1,h);
+  // roof
+  cx.fillStyle=P3; cx.fillRect(sx-3,sy-h-4,w+6,4);
+  // windows (more as rung grows)
+  cx.fillStyle=P0;
+  const wins=Math.min(6,1+rung*2);
+  for(let i=0;i<wins;i++){ const wx=sx+5+(i%3)*12, wy=sy-h+5+Math.floor(i/3)*10; cx.fillRect(wx,wy,7,6); cx.fillStyle=P1;cx.fillRect(wx,wy+3,7,1);cx.fillStyle=P0; }
+  // door
+  cx.fillStyle=P3; cx.fillRect(sx+w/2-5,sy-13,10,13);
+  cx.fillStyle=P1; cx.fillRect(sx+w/2-3,sy-11,6,11);
+  cx.fillStyle=P3; cx.fillRect(sx+w/2+1,sy-6,2,2);
+}
+/* interior furniture */
+function drawFurn(sub,sx,sy,st){
+  const put=(x,y,w,h,c)=>{cx.fillStyle=c;cx.fillRect(sx+x,sy+y,w,h);};
+  if(sub==="bed"){ // hospital bed with a stability bar
+    put(-2,-2,20,14,P1); put(-2,-2,20,1,P3);put(-2,11,20,1,P3);put(-2,-2,1,14,P3);put(17,-2,1,14,P3);
+    put(0,0,16,4,P0); // pillow/patient
+    const lvl=st&&st.lvl!=null?st.lvl:100;
+    put(-2,-7,20,3,P3); const w=Math.max(0,Math.round(18*lvl/100)); put(-1,-6,w,1,lvl<30?P0:P0);
+    if(st&&st.lost){ put(4,2,8,1,P3);put(4,4,8,1,P3); } // flatline marks
+  } else if(sub==="desk"||sub==="terminal"||sub==="ship"){
+    put(-2,-6,20,4,P3); put(0,-4,16,2,P0); // screen
+    put(-1,-2,18,10,P2); put(-1,7,18,1,P3);
+    if(sub==="ship"){ put(4,-5,8,1,P0); }
+    if(st&&st.red){ put(0,-4,16,2,P3); } // red screen unfixed
+  } else if(sub==="patient"){ drawChar(cx,sx-2,sy-4,{gender:"other",outfit:"dress",dir:"down",frame:0}); if(st&&st.done){put(-4,-10,4,4,P3);}
+  } else if(sub==="bug"){ // a glitchy monitor
+    put(-2,-6,20,12,P2); put(-2,-6,20,1,P3);put(-2,5,20,1,P3);
+    if(st&&st.fixed){ put(0,-4,16,8,P0); put(4,-1,3,2,P3);put(9,-1,3,2,P3); } // green/ok face
+    else { for(let i=0;i<16;i+=3){put(i-2,-4+((i%2)?2:0),2,2,P3);} } // glitch
+  } else if(sub==="bench"){ // lab bench
+    put(-4,-4,26,4,P3); put(-2,0,22,8,P2); put(-2,7,22,1,P3);
+    put(2,-8,3,4,P0); put(8,-9,3,5,P0); put(14,-8,3,4,P0); // flasks
+  } else if(sub==="console"){ // mixing console
+    put(-4,-2,28,10,P2); put(-4,-2,28,1,P3);put(-4,7,28,1,P3);
+    for(let i=0;i<5;i++){ put(-1+i*5,0,1,6,P0); put(-1+i*5,1+i%3,3,1,P3);} }
+  else if(sub==="exit"){ drawDoorProp(sx-2,sy-30); }
+}
+
+/* ================= CONTENT ================= */
+const START_TIME=120;
+const COST={glimpse:4,micro:14,deep:34};
+const PATHS={
+  med:{name:"MEDICINE",tag:"the approved door", building:"HOSPITAL",
+    pitch:["\"Medicine. Everyone nods when you say it.\"","\"A decade of your life — and the weight of other people's outcomes on your hands.\""],
+    rungs:[
+      {item:"Hospital Badge",desc:"5 a.m. corridor, the light too clean. A chart in your hands, the room waiting on what you'll say. It feels like mattering — and like a weight you won't put down."},
+      {item:"Scribe's Pen",desc:"You triaged a full waiting room. Getting it right meant seeing who was quietly dying under a calm face. You'd carry that vigilance for the rest of your life."},
+      {item:"White Coat",desc:"A night shift where more people needed you than there was of you. You kept some stable. Some you couldn't reach in time. That arithmetic never stops being yours."}],
+    scroll:{item:"Physician's Scroll",peak:"You chose the weight on purpose.",
+      sections:{"CLASSES":["Intro bio + lab, gen & organic chem","Physics, biochem, statistics","Psych & sociology (on the MCAT)"],
+        "SKILLS":["Memorization stamina over years","Clinical empathy under exhaustion","A decade of delayed payoff"],
+        "WAYS IN":["Hospital volunteering; EMT/CNA cert","Medical scribing for exposure","Shadow a physician; clinical lab RA"],
+        "REACH OUT":["Pre-health advising office first","Physicians via family / alumni","MD & MD/PhD students"]}}},
+  build:{name:"BUILDING",tag:"the cheap door", building:"THE GARAGE",
+    pitch:["\"Building. Software, startups, things that ship.\"","\"Cheap to enter — and the doors stay open behind you.\""],
+    rungs:[
+      {item:"Floppy Disk",desc:"2 a.m. You hunted a bug through your own code, found the one wrong line, and the thing finally ran. A stranger used it within the hour. That loop is a drug."},
+      {item:"Hackathon Tag",desc:"You shipped it broken against a countdown, because done beats perfect and the room was waiting. Nobody here asks permission to be anything."},
+      {item:"Mech Keyboard",desc:"You've shipped enough that your skills follow you anywhere. Even all-in, most doors stay open behind you. Betting here costs less than almost anywhere."}],
+    scroll:{item:"Builder's Scroll",peak:"You could just build the door instead of waiting at one.",
+      sections:{"CLASSES":["Intro CS (CS50 free), data structures","Linear algebra + a systems course","Most of it is self-teachable"],
+        "SKILLS":["Shipping unfinished things publicly","Debugging persistence","Reading docs & source, not courses"],
+        "WAYS IN":["One real project on GitHub this month","Hackathons; contribute to OSS","YC Startup School (free); intern early"],
+        "REACH OUT":["Founders on X/LinkedIn — cold works","Campus build club & meetups","Anyone shipping what you admire"]}}},
+  sound:{name:"SOUND",tag:"the risky door", building:"THE STUDIO",
+    pitch:["\"Sound. Make things people feel — maybe get paid.\"","\"A skill forever. A living? The door is narrow.\""],
+    rungs:[
+      {item:"Cassette Tape",desc:"You built a groove from nothing — kick, snare, a hat that drove it — and something in your chest unlocked when it locked in. Nobody asked for it. You'd make it anyway."},
+      {item:"Guitar Pick",desc:"You mixed it until it finally sat in the pocket. The difference between 'fine' and 'right' was invisible to everyone but you, and it was the whole job."},
+      {item:"Studio Key",desc:"Good enough now that the only question left is the economics. A skill for life; as a living, you can see exactly how narrow the door is."}],
+    scroll:{item:"Composer's Scroll",peak:"You bet on the thing that unlocked your chest, knowing the math.",
+      sections:{"CLASSES":["Music theory + ear training","Audio production in a real DAW","One business-of-music course"],
+        "SKILLS":["Output when no one's asking","Taste; nerve to share early","Metabolizing rejection"],
+        "WAYS IN":["Release on streaming; open-mic rooms","Sync/licensing for early income","One track a week, publicly"],
+        "REACH OUT":["Local musicians, campus radio","Producers whose sound you'd study","Open-mic & DIY-venue scenes"]}}},
+  research:{name:"RESEARCH",tag:"the slow door", building:"THE LAB",
+    pitch:["\"Research. Sit with one question for years.\"","\"Reversible early. The PhD is a long, quiet bet.\""],
+    rungs:[
+      {item:"Lab Notebook",desc:"A result that wouldn't replicate. The skill wasn't brilliance — it was changing one variable at a time, patiently, until the blot finally came clean. It ate the whole semester."},
+      {item:"Petri Dish",desc:"You ran the same question into the dark, trial after noisy trial, until a signal slowly rose out of the scatter. The payoff came years slower than you wanted. You waited anyway."},
+      {item:"Journal Paper",desc:"On the runway to a PhD — five, six years with one question while the world moves. People find out who they are through the waiting."}],
+    scroll:{item:"Scholar's Scroll",peak:"You chose the slow question over the fast ones on purpose.",
+      sections:{"CLASSES":["Field intro sequence + heavy math/stats","Research methods early","Scientific writing — the bottleneck"],
+        "SKILLS":["Tolerance for slow payoff","Deep focus; reading papers","Being usefully wrong"],
+        "WAYS IN":["Undergrad RA — email PIs","Summer REU program","Undergrad poster session"],
+        "REACH OUT":["Professors — office hours on-ramp","Grad students in labs you like","PIs whose papers you enjoyed"]}}}
+};
+const CATS=["CLASSES","SKILLS","WAYS IN","REACH OUT"];
+const LAYOUT=[ {id:"med",side:-1,slot:0},{id:"build",side:1,slot:0},{id:"sound",side:-1,slot:1},{id:"research",side:1,slot:1} ];
+
+/* ================= STATE ================= */
+function freshState(){
+  return { scene:"builder", time:START_TIME, avatar:{gender:"man",outfit:"shorts"},
+    pathState:{med:{rung:0},build:{rung:0},sound:{rung:0},research:{rung:0}},
+    committed:null, inventory:[], player:{x:0,y:95,dir:"up",frame:0,animT:0}, cam:{x:0,y:0},
+    doorTriggered:false, interior:null };
+}
+let G=freshState();
+let interactables=[], solids=[], trees=[];
+function anyOverlay(){ return el("intro").style.display==="block"||el("inventory").style.display==="block"
+  ||el("detail").style.display==="block"||el("pause").style.display==="block"||dlg.open
+  ||el("builderWrap").style.display==="flex"||el("seq").style.display==="flex"||el("mix").style.display==="flex"||el("acc").style.display==="flex"; }
+
+/* ================= PLAZA ================= */
+function slotY(slot){ return -slot*150; }
+function stallCenter(p){ return {x:p.side*74, y:slotY(p.slot)-22}; }
+function vendorPos(p){ return {x:p.side*30, y:slotY(p.slot)}; }
+function buildingPos(p){ return {x:p.side*150, y:slotY(p.slot)+6}; } // door foot
+
+function buildPlaza(spawnPath){
+  interactables=[]; solids=[]; trees=[];
+  for(const p of LAYOUT){
+    const sc=stallCenter(p), vp=vendorPos(p), P=PATHS[p.id], bp=buildingPos(p);
+    solids.push({x:sc.x-24,y:sc.y-16,w:48,h:24});
+    interactables.push({kind:"vendor",path:p.id, x:vp.x-8,y:vp.y-8,w:16,h:16, cx:vp.x,cy:vp.y, label:P.name});
+    // glimpse sign (rung>=1)
+    const gsx=p.side*95;
+    interactables.push({kind:"glimpsesign",path:p.id, x:gsx-8,y:slotY(p.slot)-8,w:16,h:20, cx:gsx,cy:slotY(p.slot), label:P.rungs[0].item});
+    // building (rung>=1) — door foot
+    solids.push({x:bp.x-20,y:bp.y-30,w:40,h:24, building:p.id});
+    interactables.push({kind:"building",path:p.id, x:bp.x-6,y:bp.y-14,w:12,h:16, cx:bp.x,cy:bp.y-4, label:P.building});
+    // commit category posts + home
+    for(let i=0;i<4;i++){ const sx=p.side*(300+46*i), sy=slotY(p.slot)+(i%2?18:-18);
+      interactables.push({kind:"cat",path:p.id,cat:i, x:sx-8,y:sy-8,w:16,h:20, cx:sx,cy:sy, label:CATS[i]}); }
+    interactables.push({kind:"home",path:p.id, x:p.side*490-8,y:slotY(p.slot)-8,w:16,h:20, cx:p.side*490,cy:slotY(p.slot), label:"YOUR LIFE HERE"});
+    trees.push({x:p.side*225, y:slotY(p.slot)-40});
+  }
+  trees.push({x:-40,y:200},{x:40,y:210},{x:-120,y:150},{x:120,y:150});
+  if(spawnPath){ const vp=vendorPos(LAYOUT.find(l=>l.id===spawnPath)); G.player.x=vp.x; G.player.y=vp.y+40; G.player.dir="up"; }
+  else { G.player.x=0; G.player.y=95; G.player.dir="up"; }
+  el("hud").style.display="flex"; el("taskHud").style.display="none"; updateHUD();
+}
+function buildIntroRoom(){
+  interactables=[]; solids=[]; trees=[{x:-70,y:-40},{x:80,y:60},{x:-90,y:70}];
+  interactables.push({kind:"door", x:110,y:-18,w:20,h:36, cx:120,cy:0, label:"LIFE", door:true, always:true});
+  G.player.x=0;G.player.y=0;G.player.dir="right"; G.doorTriggered=false;
+  el("hud").style.display="none"; el("taskHud").style.display="none";
+}
+function active(it){
+  if(it.always) return true;
+  if(it.kind==="vendor"||it.kind==="door"||it.kind==="building") return true;
+  if(it.kind==="glimpsesign") return G.pathState[it.path].rung>=1;
+  if(it.kind==="building") return G.pathState[it.path].rung>=1;
+  if(it.kind==="cat"||it.kind==="home") return G.committed===it.path;
+  return false;
+}
+
+/* ================= INTERIOR + TASKS ================= */
+const IW=220, IH=180; // interior room size
+function enterInterior(path,mode){
+  fadeTo(()=>{ buildInterior(path,mode); ensureLabels(); });
+}
+function roomWalls(){
+  const W=IW,H=IH; return [
+    {x:-W/2,y:-H/2,w:W,h:10}, {x:-W/2,y:H/2-10,w:W,h:10},
+    {x:-W/2,y:-H/2,w:10,h:H}, {x:W/2-10,y:-H/2,w:10,h:H}
+  ];
+}
+function buildInterior(path,mode){
+  G.scene="interior";
+  const key=path+"_"+mode;
+  G.interior={path,mode,key,phase:"active",t:{},stations:[]};
+  interactables=[]; solids=roomWalls(); trees=[];
+  // exit door (bottom center)
+  interactables.push({kind:"exit", x:-8,y:IH/2-24,w:16,h:20, cx:0,cy:IH/2-14, label:"leave", always:true});
+  G.player.x=0; G.player.y=IH/2-34; G.player.dir="up";
+  el("hud").style.display="none"; el("taskHud").style.display="block";
+  TASKS[key].init();
+  showIntro(TASKS[key].title, TASKS[key].brief);
+}
+function interiorStations(){ return interactables.filter(i=>i.kind==="station"); }
+function addStation(sub,x,y,label,extra){ const s={kind:"station",sub,x:x-8,y:y-8,w:16,h:16,cx:x,cy:y,label,always:true,st:extra||{}}; interactables.push(s); return s; }
+
+/* task registry */
+const TASKS={};
+
+/* ---- MEDICINE micro: triage ---- */
+TASKS.med_micro={ title:"ER TRIAGE", brief:"Walk to each patient and read them, then go to the triage desk and assign each an acuity. The dangerous mistake is under-triaging someone who looks calm. SPACE to interact.",
+  init(){
+    G.interior.t.patients=[
+      {name:"BED 1 — man, 58",pres:"Crushing chest pain. Sweating, gray, clutching his arm. Barely gets words out.",correct:0},
+      {name:"BED 2 — woman, 24",pres:"Rolled her ankle in intramurals. Walked in, laughing, icing it herself.",correct:2},
+      {name:"BED 3 — kid, 6",pres:"High fever, floppy, breathing fast, not really tracking you. Parents scared.",correct:1}
+    ];
+    G.interior.t.assessed=[false,false,false];
+    addStation("patient",-60,-40,"BED 1",{i:0});
+    addStation("patient",0,-55,"BED 2",{i:1});
+    addStation("patient",60,-40,"BED 3",{i:2});
+    addStation("desk",0,10,"TRIAGE DESK",{desk:true});
+  },
+  onStation(s){
+    const T=G.interior.t;
+    if(s.sub==="patient"){ const p=T.patients[s.st.i]; T.assessed[s.st.i]=true; s.st.done=true; openDialogue(p.name,[p.pres]); }
+    else { if(T.assessed.filter(Boolean).length<3){ openDialogue("TRIAGE DESK",["Assess all three patients first — go read them."]); return; }
+      triageAsk(0,0); }
+  } };
+function triageAsk(i,score){
+  const T=G.interior.t, p=T.patients[i];
+  openDialogue("YOUR CALL — "+p.name,[p.pres],[
+    {label:"IMMEDIATE (ESI 1-2)",onPick:()=>triageAns(i,0,score)},
+    {label:"URGENT (ESI 3)",onPick:()=>triageAns(i,1,score)},
+    {label:"MINOR (ESI 4-5)",onPick:()=>triageAns(i,2,score)}
+  ]);
+}
+function triageAns(i,ans,score){
+  const T=G.interior.t, p=T.patients[i];
+  const right=ans===p.correct; if(right)sfx.good();else sfx.bad();
+  const ns=score+(right?1:0);
+  let fb=right?"Correct.":(ans>p.correct?"Under-triaged — this one can't wait.":"Over-triaged — you'll burn a bed you need.");
+  openDialogue("YOUR CALL",[fb],null,()=>{
+    if(i<2) triageAsk(i+1,ns);
+    else finishTrial("med","micro", ns/3);
+  });
+}
+
+/* ---- MEDICINE deep: night shift (TEND) ---- */
+TASKS.med_deep={ title:"NIGHT SHIFT", brief:"Four patients, one of you. Each bed's stability drops on its own — walk over and press SPACE to stabilize. You can't be everywhere. Keep who you can alive until the shift ends.",
+  init(){
+    const beds=[{x:-62,y:-42},{x:62,y:-42},{x:-62,y:22},{x:62,y:22}];
+    G.interior.t.timer=42; G.interior.t.beds=[];
+    beds.forEach((b,i)=>{ const st={lvl:72,lost:false,cd:0}; addStation("bed",b.x,b.y,"BED "+(i+1),st); G.interior.t.beds.push(st); });
+  },
+  onStation(s){
+    if(s.sub!=="bed") return; const st=s.st;
+    if(st.lost){ openDialogue("BED",["You couldn't get back to them in time."]); return; }
+    if(st.cd>0){ return; }
+    st.lvl=Math.min(100,st.lvl+42); st.cd=0.5; sfx.heal();
+  },
+  update(dt){
+    const T=G.interior.t; if(G.interior.phase!=="active")return;
+    const s=dt/1000; T.timer-=s;
+    for(const b of T.beds){ if(b.lost)continue; b.cd=Math.max(0,b.cd-s); b.lvl-=2.3*s;
+      if(b.lvl<=0){ b.lvl=0; b.lost=true; sfx.crash(); } }
+    const alive=T.beds.filter(b=>!b.lost).length;
+    el("taskHud").textContent="SHIFT "+Math.max(0,Math.ceil(T.timer))+"s   ·   ALIVE "+alive+"/4";
+    if(T.timer<=0){ G.interior.phase="done";
+      finishTrial("med","deep", alive/4, alive===4?"You held the line — every one of them made it to morning.":
+        (alive===0?"You lost them all. Nobody could have done more, and that doesn't help.":"You kept "+alive+" of 4 stable. The other"+(4-alive>1?"s":"")+" — that arithmetic is yours to carry.")); }
+  } };
+
+/* ---- BUILDING micro: debug ---- */
+TASKS.build_micro={ title:"MAKE IT RUN", brief:"It won't compile. Walk to the terminal and find the one broken line. Ship it when it's green.",
+  init(){ addStation("terminal",0,-30,"TERMINAL",{}); },
+  onStation(s){ debugRound(0); } };
+const DEBUG_ROUNDS=[
+  {q:"Build failed. Which line is wrong?",opts:["let total = price * qty","if (user =! null) {","return total;","console.log(total)"],correct:1,why:"`=!` isn't a thing — you meant `!==`."},
+  {q:"Ships, but crashes on click. Which line?",opts:["const btn = get('buy')","btn.onclik = submit","submit()","el.style.color = red"],correct:1,why:"`onclik` — a typo the compiler won't catch."}
+];
+function debugRound(i){
+  const r=DEBUG_ROUNDS[i];
+  openDialogue("TERMINAL",[r.q],r.opts.map((o,idx)=>({label:o,onPick:()=>{
+    if(idx===r.correct){ sfx.good(); openDialogue("TERMINAL",["Fixed. "+r.why,"It compiles. It runs."],null,()=>{ if(i<DEBUG_ROUNDS.length-1) debugRound(i+1); else finishTrial("build","micro",1); }); }
+    else { sfx.bad(); openDialogue("TERMINAL",["Still red. Look again."],null,()=>debugRound(i)); }
+  }})));
+}
+
+/* ---- BUILDING deep: ship under the clock ---- */
+TASKS.build_deep={ title:"SHIP THE DEMO", brief:"Demo in under a minute. Three bugs are live (red monitors). Fix each, then hit SHIP. If the clock runs out you ship it anyway — done beats perfect.",
+  init(){
+    G.interior.t.timer=52; G.interior.t.fixed=[false,false,false];
+    const spots=[{x:-62,y:-40},{x:62,y:-40},{x:0,y:-52}];
+    spots.forEach((p,i)=>addStation("bug",p.x,p.y,"BUG "+(i+1),{i,red:true}));
+    addStation("ship",0,20,"SHIP",{ship:true});
+  },
+  onStation(s){
+    const T=G.interior.t;
+    if(s.sub==="bug"){ if(T.fixed[s.st.i]){ openDialogue("BUG",["Already green. Go hit SHIP."]); return; } bugFix(s); }
+    else { const n=T.fixed.filter(Boolean).length;
+      if(n<3){ openDialogue("SHIP",["Still "+(3-n)+" red monitor(s). ...ship anyway?"],[
+        {label:"No, fix them",onPick:()=>closeDialogue()},
+        {label:"Ship it broken",onPick:()=>{ closeDialogue(); finishTrial("build","deep",0.4,"You shipped it broken and the room clapped anyway. That's the culture: momentum over polish."); }}
+      ]); }
+      else { finishTrial("build","deep", Math.min(1,0.6+T.timer/120), "It ships clean, with time to spare. For a second, everything you made just... worked."); }
+    }
+  },
+  update(dt){ const T=G.interior.t; if(G.interior.phase!=="active")return; T.timer-=dt/1000;
+    const n=T.fixed.filter(Boolean).length; el("taskHud").textContent="DEMO IN "+Math.max(0,Math.ceil(T.timer))+"s   ·   FIXED "+n+"/3";
+    if(T.timer<=0){ G.interior.phase="done"; finishTrial("build","deep",0.3,"Time's up — you ship what you have, bugs and all. The demo half-works and nobody minds."); } } };
+const BUG_FIX=[
+  {q:"Null crash on load. Fix?",opts:["Add a null check before use","Delete the feature","Wrap everything in try/catch"],correct:0},
+  {q:"Layout breaks on mobile. Fix?",opts:["Ignore mobile","Add a responsive breakpoint","Hardcode 1920px width"],correct:1},
+  {q:"API call times out. Fix?",opts:["Retry with a timeout+fallback","Call it 10 more times","Remove the loading spinner"],correct:0}
+];
+function bugFix(s){ const r=BUG_FIX[s.st.i];
+  openDialogue("BUG "+(s.st.i+1),[r.q],r.opts.map((o,idx)=>({label:o,onPick:()=>{
+    if(idx===r.correct){ sfx.good(); G.interior.t.fixed[s.st.i]=true; s.st.red=false; s.st.fixed=true; openDialogue("BUG",["Green. Next."]); }
+    else { sfx.bad(); openDialogue("BUG",["That makes it worse."],null,()=>closeDialogue()); }
+  }}))); }
+
+/* ---- RESEARCH micro: won't replicate ---- */
+TASKS.research_micro={ title:"IT WON'T REPLICATE", brief:"Your western blot keeps failing. The skill is changing ONE variable at a time until you find the culprit — not changing everything at once. Walk to the bench.",
+  init(){ addStation("bench",0,-30,"BENCH",{}); G.interior.t.step=0; },
+  onStation(s){ replicate(0); } };
+const REPL=[
+  {sym:"Run 1: no bands at all. Blank.",opts:["Increase primary antibody concentration","Change antibody, blocker, AND transfer time","Give up for the day"],correct:0,why:"Weak/no signal → your antibody's too dilute. One variable."},
+  {sym:"Run 2: bands, but the whole blot is gray fog.",opts:["Change five things at once","Optimize the blocking buffer","Run it again identically"],correct:1,why:"High background → blocking. Still one variable at a time."},
+  {sym:"Run 3: clean bands... but only on half the membrane.",opts:["Fix the transfer (voltage/time)","Blame the antibody again","Publish it anyway"],correct:0,why:"Uneven signal → transfer. Now it's clean."}
+];
+function replicate(i){ const r=REPL[i];
+  openDialogue("BENCH",[r.sym],r.opts.map((o,idx)=>({label:o,onPick:()=>{
+    if(idx===r.correct){ sfx.good(); openDialogue("BENCH",[r.why],null,()=>{ if(i<REPL.length-1) replicate(i+1); else finishTrial("research","micro",1,"It finally replicates — clean bands, three times running. It took the whole semester and it was one variable at a time."); }); }
+    else { sfx.bad(); openDialogue("BENCH",["Still broken — and now you don't know which change did it. Reset. One variable."],null,()=>replicate(i)); }
+  }})));
+}
+
+/* ---- RESEARCH deep: the long question (accumulate) ---- */
+TASKS.research_deep={ title:"THE LONG QUESTION", brief:"One question, into the dark. Run trials — each is noisy and slow. A real signal only shows after many runs. Don't publish until the data's ready.",
+  init(){ addStation("bench",0,-30,"BENCH",{}); G.interior.t.runs=[]; G.interior.t.open=false; },
+  onStation(s){ openAcc(); } };
+
+/* ---- SOUND micro: sequencer ---- */
+TASKS.sound_micro={ title:"MAKE A BEAT", brief:"Program a groove: kick on the 1, snare on the backbeat, hats to drive it. Toggle steps, hit play, then lock it in.",
+  init(){ addStation("desk",0,-30,"DESK",{}); }, onStation(s){ openSeq(); } };
+/* ---- SOUND deep: mixer ---- */
+TASKS.sound_deep={ title:"GET IT TO SIT", brief:"The parts are there; now make them sit in the pocket. Kick out front, snare just under it, hats underneath without poking out.",
+  init(){ addStation("console",0,-30,"CONSOLE",{}); }, onStation(s){ openMix(); } };
+
+function finishTrial(path,mode,quality,extraLine){
+  if(G.interior){ if(G.interior.phase==="done") return; G.interior.phase="done"; }
+  const rungIdx=mode==="micro"?1:2;
+  const P=PATHS[path], rd=P.rungs[rungIdx];
+  G.inventory.push({path,rung:rungIdx,name:rd.item,desc:rd.desc,kind:"keepsake"});
+  G.pathState[path].rung=rungIdx+1;
+  const lines=[]; if(extraLine)lines.push(extraLine); lines.push(rd.desc); lines.push("Acquired: "+rd.item+".");
+  // return to plaza, then show peak-end
+  fadeTo(()=>{ G.scene="plaza"; buildPlaza(path); ensureLabels(); openDialogue(P.name,lines); });
+}
+
+/* ================= CAMERA + RENDER ================= */
+function updateCam(){ G.cam.x=G.player.x-(VW/2-HALF); G.cam.y=G.player.y-(VH/2-HALF); }
+const R=v=>Math.round(v); function wx(x){return R(x-G.cam.x);} function wy(y){return R(y-G.cam.y);}
+function rng(a,b){ let h=(a*73856093 ^ b*19349663)>>>0; h=(h^(h>>13))*1274126177>>>0; return (h>>>0)/4294967295; }
+function drawGrass(){
+  cx.fillStyle=P0; cx.fillRect(0,0,VW,VH);
+  const t=16, tx0=Math.floor(G.cam.x/t)-1, ty0=Math.floor(G.cam.y/t)-1;
+  for(let ty=ty0;ty<ty0+VH/t+2;ty++)for(let tx=tx0;tx<tx0+VW/t+2;tx++){
+    const px=tx*t-G.cam.x, py=ty*t-G.cam.y, r=rng(tx,ty);
+    cx.fillStyle=P1; cx.fillRect(px+3+((r*7)|0),py+10,1,3); cx.fillRect(px+9,py+6+((r*5)|0),1,2);
+    if(r>0.72){ cx.fillStyle=P2; cx.fillRect(px+12,py+12,1,2); }
+    if(r>0.94){ cx.fillStyle=P2; cx.fillRect(px+6,py+4,3,1);cx.fillRect(px+7,py+3,1,3); cx.fillStyle=P3; cx.fillRect(px+7,py+4,1,1); }
+  }
+}
+function drawRoad(){
+  const x0=wx(-18), w=36; cx.fillStyle=P1; cx.fillRect(x0,0,w,VH);
+  cx.fillStyle=P2; cx.fillRect(x0,0,2,VH); cx.fillRect(x0+w-2,0,2,VH);
+  const ty0=Math.floor(G.cam.y/8)-1;
+  for(let ty=ty0;ty<ty0+VH/8+2;ty++){ const py=ty*8-G.cam.y, r=rng(7,ty); cx.fillStyle=P2;
+    cx.fillRect(x0+4+((r*24)|0),py+2,2,1); if(r>0.5) cx.fillRect(x0+10+((rng(3,ty)*14)|0),py+5,1,1); }
+}
+function drawInteriorFloor(){
+  cx.fillStyle=P0; cx.fillRect(0,0,VW,VH);
+  // floor speckle
+  const t=16, tx0=Math.floor(G.cam.x/t)-1, ty0=Math.floor(G.cam.y/t)-1;
+  cx.fillStyle=P1;
+  for(let ty=ty0;ty<ty0+VH/t+2;ty++)for(let tx=tx0;tx<tx0+VW/t+2;tx++){ const px=tx*t-G.cam.x, py=ty*t-G.cam.y; cx.fillRect(px+15,py,1,16); cx.fillRect(px,py+15,16,1); }
+  // walls
+  cx.fillStyle=P2;
+  for(const s of solids){ cx.fillRect(wx(s.x),wy(s.y),s.w,s.h); }
+  cx.fillStyle=P3;
+  for(const s of solids){ cx.fillRect(wx(s.x),wy(s.y),s.w,1); cx.fillRect(wx(s.x),wy(s.y),1,s.h); }
+}
+function drawPromptBubble(px,py){ const t=Math.floor(Date.now()/300)%2;
+  cx.fillStyle=P3;cx.fillRect(px-3,py-t,6,6); cx.fillStyle=P0;cx.fillRect(px-1,py+1-t,2,2); cx.fillStyle=P3;cx.fillRect(px-1,py+3-t,2,1); }
+
+/* labels */
+const labelsEl=el("labels"); const L={};
+function ensureLabels(){ labelsEl.innerHTML=""; for(const k in L) delete L[k];
+  const pr=document.createElement("div"); pr.className="label hide"; labelsEl.appendChild(pr); L.__prompt=pr;
+  if(G.scene==="plaza"){ for(const p of LAYOUT){ const l=document.createElement("div"); l.className="label"; l.textContent=PATHS[p.id].name; labelsEl.appendChild(l); L[p.id]=l; } }
+  else if(G.scene==="introRoom"){ const l=document.createElement("div"); l.className="label door"; l.textContent="LIFE"; labelsEl.appendChild(l); L.__door=l; }
+}
+function place(lbl,worldX,worldY){ if(!lbl)return; const sx=wx(worldX), sy=wy(worldY);
+  if(sx<-24||sx>VW+24||sy<-24||sy>VH+24){ lbl.classList.add("hide"); return; }
+  lbl.classList.remove("hide"); lbl.style.left=(sx/VW*100)+"%"; lbl.style.top=(sy/VH*100)+"%"; }
+
+/* ================= INPUT ================= */
+const keys={};
+addEventListener("keydown",e=>{ const k=e.key.toLowerCase();
+  if(["w","a","s","d"," ","arrowup","arrowdown","arrowleft","arrowright","escape","b","i","p","enter"].includes(k)) e.preventDefault();
+  keys[k]=true; if(e.repeat) return; action(k); });
+addEventListener("keyup",e=>{ keys[e.key.toLowerCase()]=false; });
+const up=k=>k==="w"||k==="arrowup", down=k=>k==="s"||k==="arrowdown", left=k=>k==="a"||k==="arrowleft", right=k=>k==="d"||k==="arrowright", go=k=>k===" "||k==="enter";
+function action(k){
+  if(el("intro").style.display==="block"){ if(go(k)) closeIntro(); return; }
+  if(el("pause").style.display==="block"){ pauseKey(k); return; }
+  if(el("seq").style.display==="flex"){ seqKey(k); return; }
+  if(el("mix").style.display==="flex"){ mixKey(k); return; }
+  if(el("acc").style.display==="flex"){ accKey(k); return; }
+  if(el("detail").style.display==="block"){ if(go(k)||k==="escape") backToBag(); return; }
+  if(el("inventory").style.display==="block"){ bagKey(k); return; }
+  if(dlg.open){ dlgKey(k); return; }
+  if(k==="escape"){ openPause(); return; }
+  if(k==="b"||k==="i"){ openBag(); return; }
+  if(go(k)) interactNearest();
+}
+
+/* ================= DIALOGUE ================= */
+const dlgEl=el("dialogue"),dlgName=el("dlgName"),dlgText=el("dlgText"),dlgCh=el("dlgChoices"),dlgHint=el("dlgHint");
+const dlg={open:false,lines:[],i:0,typing:false,full:"",ti:0,timer:null,choices:null,sel:0,onClose:null};
+function openDialogue(name,lines,choices,onClose){
+  dlg.open=true; dlg.lines=(lines&&lines.length)?lines:[" "]; dlg.i=0; dlg.choices=choices||null; dlg.sel=0; dlg.onClose=onClose||null;
+  dlgEl.style.display="block"; dlgName.textContent=name; dlgCh.innerHTML=""; startLine();
+}
+function startLine(){ dlg.full=dlg.lines[dlg.i]||""; dlg.ti=0; dlg.typing=true; dlgText.textContent=""; dlgCh.innerHTML="";
+  dlgHint.style.display="block"; dlgHint.textContent="▸ space"; clearInterval(dlg.timer);
+  dlg.timer=setInterval(()=>{ dlgText.textContent=dlg.full.slice(0,++dlg.ti);
+    if(dlg.ti%2===0) blip(600,0.008,"square",0.012);
+    if(dlg.ti>=dlg.full.length){ clearInterval(dlg.timer); dlg.typing=false; maybeChoices(); } },24);
+}
+function finishTyping(){ clearInterval(dlg.timer); dlgText.textContent=dlg.full; dlg.typing=false; maybeChoices(); }
+function maybeChoices(){ if(dlg.i===dlg.lines.length-1 && dlg.choices){ renderChoices(); dlgHint.style.display="none"; }
+  else if(dlg.i===dlg.lines.length-1){ dlgHint.textContent="▸ space"; } }
+function renderChoices(){ dlgCh.innerHTML=""; dlg.choices.forEach((c,i)=>{ const d=document.createElement("div");
+  d.className="ch"+(i===dlg.sel?" sel":"")+(c.disabled?" dis":""); d.textContent=(i===dlg.sel?"▸ ":"  ")+c.label; dlgCh.appendChild(d); }); }
+function dlgKey(k){
+  if(dlg.typing){ if(go(k)) finishTyping(); return; }
+  const atEnd=dlg.i===dlg.lines.length-1;
+  if(atEnd && dlg.choices){
+    if(up(k)){ dlg.sel=(dlg.sel-1+dlg.choices.length)%dlg.choices.length; sfx.select(); renderChoices(); }
+    else if(down(k)){ dlg.sel=(dlg.sel+1)%dlg.choices.length; sfx.select(); renderChoices(); }
+    else if(go(k)){ const c=dlg.choices[dlg.sel]; if(c.disabled){ sfx.deny(); return;} sfx.select(); c.onPick(); } return;
+  }
+  if(go(k)){ if(!atEnd){ dlg.i++; startLine(); } else closeDialogue(); }
+}
+function closeDialogue(){ dlg.open=false; dlgEl.style.display="none"; dlgCh.innerHTML=""; const f=dlg.onClose; dlg.onClose=null; if(f)f(); }
+
+/* ================= INTERACTION ================= */
+function inRange(it){ const dx=(G.player.x+8)-it.cx, dy=(G.player.y+12)-it.cy; return dx*dx+dy*dy<34*34; }
+function nearestActive(){ let best=null,bd=1e9;
+  for(const it of interactables){ if(!active(it))continue; if(inRange(it)){ const dx=(G.player.x+8)-it.cx,dy=(G.player.y+12)-it.cy,d=dx*dx+dy*dy; if(d<bd){bd=d;best=it;} } } return best; }
+function interactNearest(){ const it=nearestActive(); if(it) doInteract(it); }
+function doInteract(it){
+  if(it.kind==="vendor") return openVendor(it.path);
+  if(it.kind==="building") return openBuilding(it.path);
+  if(it.kind==="glimpsesign"){ const P=PATHS[it.path]; return openDialogue(P.rungs[0].item,[P.rungs[0].desc]); }
+  if(it.kind==="cat"){ const P=PATHS[it.path]; return openDialogue(CATS[it.cat],[P.scroll.sections[CATS[it.cat]].map((s,i)=>(i+1)+". "+s).join("   ")]); }
+  if(it.kind==="home"){ const P=PATHS[it.path]; return openDialogue("YOUR LIFE",[P.scroll.peak,"This is the life you bet on. Press ESC to start over."]); }
+  if(it.kind==="station"){ return TASKS[G.interior.key].onStation(it); }
+  if(it.kind==="exit"){ return exitInterior(); }
+}
+function exitInterior(){
+  openDialogue("LEAVE",["Walk out now? The weeks you spent are gone and the trial's unfinished."],[
+    {label:"Leave (weeks spent)",onPick:()=>{ closeDialogue(); fadeTo(()=>{ G.scene="plaza"; buildPlaza(G.interior.path); ensureLabels(); }); }},
+    {label:"Stay",onPick:()=>closeDialogue()}
+  ]);
+}
+function openVendor(id){
+  const P=PATHS[id],st=G.pathState[id];
+  if(G.committed&&G.committed!==id) return openDialogue(P.name,["\"You've already bet your life elsewhere. This door isn't yours now.\""]);
+  if(G.committed===id) return openDialogue(P.name,["\"You chose this. Walk your path — the next steps are posted along it.\""]);
+  if(st.rung===0){
+    const lines=P.pitch.slice(); lines.push("\"A glimpse costs "+COST.glimpse+" weeks. No refunds.\"");
+    openDialogue(P.name,lines,[ {label:"Buy Glimpse — "+COST.glimpse+" wks",disabled:G.time<COST.glimpse,onPick:()=>buyGlimpse(id)}, {label:"Not now",onPick:()=>closeDialogue()} ]);
+  } else if(st.rung<3){ openDialogue(P.name,["\"You've glimpsed it. The real thing's in the "+P.building.toLowerCase()+" — go do the work.\""]);
+  } else { openDialogue(P.name,["\"You've done the trials. There's nothing left but to become it.\""],[
+      {label:"Commit — this is my life",onPick:()=>commitPath(id)}, {label:"Keep my options open",onPick:()=>closeDialogue()} ]); }
+}
+function buyGlimpse(id){ if(G.time<COST.glimpse){sfx.deny();return;} G.time-=COST.glimpse; const P=PATHS[id],rd=P.rungs[0];
+  G.inventory.push({path:id,rung:0,name:rd.item,desc:rd.desc,kind:"keepsake"}); G.pathState[id].rung=1; sfx.buy(); updateHUD();
+  openDialogue(P.name,["You spent "+COST.glimpse+" weeks. "+G.time+" left.","Acquired: "+rd.item+". A sign appeared, and the "+P.building.toLowerCase()+" opened — that's where the real work is."]); }
+function openBuilding(id){
+  const P=PATHS[id],st=G.pathState[id];
+  if(G.committed===id) return openDialogue(P.building,["This is your life now. The doors down the road are your next steps."]);
+  if(G.committed&&G.committed!==id) return openDialogue(P.building,["You bet elsewhere. This place isn't yours to enter."]);
+  if(st.rung<1) return openDialogue(P.building,["It's locked. Glimpse the path at the stall first."]);
+  if(st.rung===1){ const c=COST.micro;
+    openDialogue(P.building,["\""+TASKS[id+"_micro"].title+"\" — a real shift.","Costs "+c+" weeks whether or not you finish. Go in?"],[
+      {label:"Enter — "+c+" wks",disabled:G.time<c,onPick:()=>{ if(G.time<c){sfx.deny();return;} G.time-=c; updateHUD(); closeDialogue(); enterInterior(id,"micro"); }},
+      {label:"Not yet",onPick:()=>closeDialogue()} ]); }
+  else if(st.rung===2){ const c=COST.deep;
+    openDialogue(P.building,["\""+TASKS[id+"_deep"].title+"\" — deeper in.","Costs "+c+" weeks whether or not you finish. Go in?"],[
+      {label:"Enter — "+c+" wks",disabled:G.time<c,onPick:()=>{ if(G.time<c){sfx.deny();return;} G.time-=c; updateHUD(); closeDialogue(); enterInterior(id,"deep"); }},
+      {label:"Not yet",onPick:()=>closeDialogue()} ]); }
+  else { openDialogue(P.building,["You've done everything here but decide. Commit at the stall."]); }
+}
+function commitPath(id){ const P=PATHS[id]; G.committed=id;
+  G.inventory.push({path:id,rung:3,name:P.scroll.item,desc:P.scroll.peak,kind:"scroll",sections:P.scroll.sections,weeksLeft:G.time});
+  sfx.commit(); updateHUD();
+  openDialogue(P.name,["You bet your life on "+P.name+". The other doors just went quiet.",P.scroll.peak,
+    "The path is open now — walk it. Your real next steps are posted along the way. (ESC to start over.)"]); }
+
+/* ================= BAG / PAUSE ================= */
+let bagSel=0;
+function openBag(){ if(anyOverlay())return; bagSel=0; renderBag(); el("inventory").style.display="block"; sfx.select(); }
+function renderBag(){ const grid=el("invGrid"); grid.innerHTML="";
+  for(let i=0;i<12;i++){ const item=G.inventory[i], slot=document.createElement("div");
+    slot.className="slot"+(item?"":" empty")+(i===bagSel&&item?" sel":"");
+    if(item){ const c=document.createElement("canvas");c.width=16;c.height=16;drawIcon(c.getContext("2d"),item.rung);
+      const nm=document.createElement("div");nm.className="nm";nm.textContent=item.name; slot.appendChild(c);slot.appendChild(nm); } grid.appendChild(slot); } }
+function bagKey(k){ const n=G.inventory.length; if(n===0){ if(k==="b"||k==="i"||k==="escape")closeBag(); return; }
+  if(left(k)){bagSel=(bagSel-1+n)%n;sfx.select();renderBag();} else if(right(k)){bagSel=(bagSel+1)%n;sfx.select();renderBag();}
+  else if(up(k)){bagSel=(bagSel-4+n)%n;sfx.select();renderBag();} else if(down(k)){bagSel=(bagSel+4)%n;sfx.select();renderBag();}
+  else if(go(k)){ openDetail(bagSel); } else if(k==="b"||k==="i"||k==="escape"){ closeBag(); } }
+function closeBag(){ el("inventory").style.display="none"; sfx.select(); }
+function openDetail(i){ const item=G.inventory[i]; if(!item)return; sfx.select();
+  el("inventory").style.display="none"; el("detail").style.display="block";
+  el("detName").textContent=item.name; el("detDesc").textContent=item.desc; const sc=el("detSections"); sc.innerHTML="";
+  if(item.kind==="scroll"){ if(item.weeksLeft!=null){ const p=document.createElement("p");p.style.color=P3;p.style.marginTop="10px";
+      p.textContent="You committed with "+item.weeksLeft+" weeks in reserve — the runway you had left to pour in."; sc.appendChild(p); }
+    for(const key of Object.keys(item.sections)){ const d=document.createElement("div");d.className="sect";
+      const hh=document.createElement("h3");hh.textContent=key;d.appendChild(hh); const ul=document.createElement("ul");
+      item.sections[key].forEach(t=>{const li=document.createElement("li");li.textContent=t;ul.appendChild(li);}); d.appendChild(ul);sc.appendChild(d); } } }
+function backToBag(){ el("detail").style.display="none"; el("inventory").style.display="block"; renderBag(); sfx.select(); }
+let pauseSel=0;
+function openPause(){ pauseSel=0; renderPause(); el("pause").style.display="block"; sfx.select(); }
+function renderPause(){ document.querySelectorAll("#pause .pm").forEach((d,i)=>d.classList.toggle("sel",i===pauseSel)); }
+function pauseKey(k){ if(up(k)||down(k)){pauseSel=(pauseSel+1)%2;sfx.select();renderPause();}
+  else if(go(k)){ if(pauseSel===0){ el("pause").style.display="none"; sfx.select(); } else restart(); }
+  else if(k==="escape"){ el("pause").style.display="none"; } }
+function restart(){ el("pause").style.display="none"; el("hud").style.display="none"; el("taskHud").style.display="none";
+  el("seq").style.display="none"; el("mix").style.display="none"; el("acc").style.display="none"; sfx.confirm();
+  seqStop(); fadeTo(()=>{ G=freshState(); startBuilder(); }); }
+
+/* ================= HUD / INTRO ================= */
+function updateHUD(){ el("hudTime").textContent=G.time; }
+function showIntro(title,body){ el("introTitle").textContent=title; el("introBody").textContent=body; el("intro").style.display="block"; }
+function closeIntro(){ el("intro").style.display="none"; sfx.confirm(); }
+
+/* ================= TASK OVERLAY: SEQUENCER ================= */
+const seqC=el("seqCanvas"), sc2=seqC.getContext("2d"); sc2.imageSmoothingEnabled=false;
+let seq={grid:[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]], row:0,col:0, playing:false, ph:0, timer:null};
+function openSeq(){ seq.grid=[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]; seq.row=0;seq.col=0;seq.playing=false;seq.ph=0;
+  el("seq").style.display="flex"; drawSeq(); }
+function drawSeq(){ const rows=["KICK","SNARE","HAT"]; sc2.fillStyle=P0; sc2.fillRect(0,0,220,130);
+  sc2.fillStyle=P3; sc2.font="8px 'Press Start 2P'"; 
+  for(let r=0;r<3;r++){ for(let c=0;c<8;c++){ const x=44+c*20, y=24+r*30;
+    sc2.fillStyle=P3; sc2.fillRect(x,y,16,20);
+    sc2.fillStyle= seq.grid[r][c]?P3:P0; sc2.fillRect(x+1,y+1,14,18);
+    if(seq.grid[r][c]){ sc2.fillStyle=P0; sc2.fillRect(x+5,y+7,6,6); }
+    if(seq.playing && c===seq.ph){ sc2.fillStyle=P2; sc2.fillRect(x,y-3,16,2); }
+    if(r===seq.row&&c===seq.col){ sc2.strokeStyle=P3; sc2.lineWidth=2; sc2.strokeRect(x-1,y-1,18,22); }
+  }
+    sc2.fillStyle=P3; sc2.fillText(rows[r],2,38+r*30); }
+}
+function seqPlayStep(){ for(let r=0;r<3;r++){ if(seq.grid[r][seq.ph]){ if(r===0)sfx.kick(); else if(r===1)sfx.snare(); else sfx.hat(); } }
+  seq.ph=(seq.ph+1)%8; drawSeq(); }
+function seqStart(){ if(seq.playing)return; seq.playing=true; seq.ph=0; seq.timer=setInterval(seqPlayStep,150); }
+function seqStop(){ seq.playing=false; if(seq.timer)clearInterval(seq.timer); seq.timer=null; }
+function seqLocked(){ const g=seq.grid; const hats=g[2].reduce((a,b)=>a+b,0); return g[0][0]&&g[1][4]&&hats>=3; }
+function seqKey(k){
+  if(up(k)){seq.row=(seq.row+2)%3;sfx.select();drawSeq();}
+  else if(down(k)){seq.row=(seq.row+1)%3;sfx.select();drawSeq();}
+  else if(left(k)){seq.col=(seq.col+7)%8;sfx.select();drawSeq();}
+  else if(right(k)){seq.col=(seq.col+1)%8;sfx.select();drawSeq();}
+  else if(k===" "){ seq.grid[seq.row][seq.col]^=1; if(seq.grid[seq.row][seq.col]){ if(seq.row===0)sfx.kick();else if(seq.row===1)sfx.snare();else sfx.hat(); } drawSeq(); }
+  else if(k==="p"){ if(seq.playing)seqStop(); else seqStart(); }
+  else if(k==="enter"){ if(seqLocked()){ seqStop(); el("seq").style.display="none"; sfx.confirm(); finishTrial("sound","micro",1); }
+    else { sfx.deny(); openDialogue("DESK",["Not a groove yet — put a kick on step 1, a snare on step 5, and at least three hats."],null,()=>{ el("seq").style.display="flex"; drawSeq(); }); el("seq").style.display="none"; } }
+  else if(k==="escape"){ seqStop(); el("seq").style.display="none"; openPause(); }
+}
+
+/* ================= TASK OVERLAY: MIXER ================= */
+const mixC=el("mixCanvas"), mc2=mixC.getContext("2d"); mc2.imageSmoothingEnabled=false;
+let mix={lv:[50,50,50], sel:0};
+const MIX_TARGET=[[66,92],[46,70],[26,50]]; const MIX_NAMES=["KICK","SNARE","HAT"];
+function openMix(){ mix.lv=[40,40,60]; mix.sel=0; el("mix").style.display="flex"; drawMix(); }
+function mixInPocket(){ return mix.lv.every((v,i)=>v>=MIX_TARGET[i][0]&&v<=MIX_TARGET[i][1]); }
+function drawMix(){ mc2.fillStyle=P0; mc2.fillRect(0,0,220,130); mc2.font="8px 'Press Start 2P'";
+  for(let i=0;i<3;i++){ const x=40+i*60, top=16, h=86;
+    mc2.fillStyle=P3; mc2.fillRect(x-1,top-1,22,h+2); mc2.fillStyle=P0; mc2.fillRect(x,top,20,h);
+    // target pocket
+    const t=MIX_TARGET[i]; const py=top+h-(t[1]/100*h), ph=(t[1]-t[0])/100*h; mc2.fillStyle=P1; mc2.fillRect(x,py,20,ph);
+    // level fill
+    const lh=mix.lv[i]/100*h; mc2.fillStyle=P2; mc2.fillRect(x,top+h-lh,20,lh);
+    // handle
+    mc2.fillStyle=P3; mc2.fillRect(x-2,top+h-lh-1,24,3);
+    if(i===mix.sel){ mc2.strokeStyle=P3;mc2.lineWidth=2;mc2.strokeRect(x-3,top-3,26,h+6); }
+    mc2.fillStyle=P3; mc2.fillText(MIX_NAMES[i], x-4, top+h+14);
+  }
+  mc2.fillStyle=P3; mc2.fillText(mixInPocket()?"IT SITS. ENTER":"...not yet", 60,128);
+}
+function mixKey(k){
+  if(up(k)){mix.sel=(mix.sel+2)%3;sfx.select();drawMix();}
+  else if(down(k)){mix.sel=(mix.sel+1)%3;sfx.select();drawMix();}
+  else if(left(k)){mix.lv[mix.sel]=Math.max(0,mix.lv[mix.sel]-4);sfx.select();drawMix();}
+  else if(right(k)){mix.lv[mix.sel]=Math.min(100,mix.lv[mix.sel]+4);sfx.select();drawMix();}
+  else if(k==="p"){ const v=mix.lv; if(v[0])blip(95,0.15,"sine",0.09*v[0]/100,55); setTimeout(()=>{noiseHit(0.08,0.05*v[1]/100);},150); setTimeout(()=>{noiseHit(0.03,0.04*v[2]/100);},70); }
+  else if(k==="enter"){ if(mixInPocket()){ el("mix").style.display="none"; sfx.confirm(); finishTrial("sound","deep",1); } else sfx.deny(); }
+  else if(k==="escape"){ el("mix").style.display="none"; openPause(); }
+}
+
+/* ================= TASK OVERLAY: ACCUMULATE ================= */
+const accC=el("accCanvas"), ac2=accC.getContext("2d"); ac2.imageSmoothingEnabled=false;
+let acc={runs:[]};
+function openAcc(){ acc.runs=[]; el("acc").style.display="flex"; el("accHint").textContent="SPACE run a trial · P publish when the data is ready"; drawAcc(); }
+function drawAcc(){ ac2.fillStyle=P0; ac2.fillRect(0,0,220,130); ac2.strokeStyle=P3; ac2.lineWidth=1;
+  ac2.strokeRect(20,10,180,100); ac2.fillStyle=P3; ac2.font="7px 'Press Start 2P'";
+  ac2.fillText("runs: "+acc.runs.length, 24, 124);
+  // points
+  ac2.fillStyle=P2;
+  acc.runs.forEach((p,i)=>{ const x=20+ (i/24)*180; const y=110-(p/100*100); ac2.fillRect(x-1,y-1,3,3); });
+  // trend line once enough data
+  if(acc.runs.length>=12){ const avg=acc.runs.reduce((a,b)=>a+b,0)/acc.runs.length;
+    const y=110-(avg/100*100); ac2.fillStyle=P3; for(let x=20;x<200;x+=4) ac2.fillRect(x,y,2,1);
+    ac2.fillText("signal!", 150, 20); el("accHint").textContent="A signal is emerging. Press P to publish."; }
+}
+function accKey(k){
+  if(k===" "){ if(acc.runs.length>=24){sfx.deny();return;} const trueSig=58; const noise=(Math.random()-0.5)*70; acc.runs.push(Math.max(2,Math.min(98,trueSig+noise))); sfx.select(); drawAcc(); }
+  else if(k==="p"){ if(acc.runs.length>=12){ el("acc").style.display="none"; sfx.confirm(); finishTrial("research","deep",1); }
+    else { sfx.deny(); openDialogue("BENCH",["Inconclusive — the noise is still bigger than the signal. Keep running."],null,()=>{ el("acc").style.display="flex"; drawAcc(); }); el("acc").style.display="none"; } }
+  else if(k==="escape"){ el("acc").style.display="none"; openPause(); }
+}
+
+/* ================= BUILDER ================= */
+const bCanvas=el("bCanvas"),bcx=bCanvas.getContext("2d"); bcx.imageSmoothingEnabled=false;
+const GENDERS=["man","woman","other"], OUTFITS=[["shorts","t-shirt & shorts"],["dress","dress"]];
+let bIdx={gender:0,outfit:0}, bFrame=0, bAnim=0;
+function renderPreview(){ bcx.fillStyle=P1;bcx.fillRect(0,0,64,64); bcx.save();bcx.translate(8,8);bcx.scale(3,3);
+  drawChar(bcx,0,0,{gender:GENDERS[bIdx.gender],outfit:OUTFITS[bIdx.outfit][0],dir:"down",frame:bFrame}); bcx.restore(); }
+document.querySelectorAll(".arrow").forEach(a=>a.onclick=()=>{ sfx.select(); const key=a.dataset.k,d=+a.dataset.d,arr=key==="gender"?GENDERS:OUTFITS;
+  bIdx[key]=(bIdx[key]+d+arr.length)%arr.length; el("vGender").textContent=GENDERS[bIdx.gender]; el("vOutfit").textContent=OUTFITS[bIdx.outfit][1]; renderPreview(); });
+el("builderOk").onclick=()=>{ sfx.confirm(); G.avatar={gender:GENDERS[bIdx.gender],outfit:OUTFITS[bIdx.outfit][0]}; el("builderWrap").style.display="none";
+  fadeTo(()=>{ G.scene="introRoom"; buildIntroRoom(); ensureLabels();
+    showIntro("A PIVOTAL POINT","You're at a point where your life could still become almost anything. Through the LIFE door are some of those possibilities. But time is finite — you will not get to do it all. Choosing one thing means closing others. That's not a bug. That's the game."); }); };
+function startBuilder(){ G.scene="builder"; el("builderWrap").style.display="flex";
+  el("vGender").textContent=GENDERS[bIdx.gender]; el("vOutfit").textContent=OUTFITS[bIdx.outfit][1]; renderPreview(); }
+
+/* ================= FADE ================= */
+const fadeEl=el("fade");
+function fadeTo(mid){ fadeEl.classList.add("on"); setTimeout(()=>{ mid(); setTimeout(()=>fadeEl.classList.remove("on"),60); },560); }
+
+/* ================= MOVEMENT ================= */
+function hits(x,y,w,h){ for(const s of solids){ if(x<s.x+s.w&&x+w>s.x&&y<s.y+s.h&&y+h>s.y) return true; } return false; }
+let stepT=0;
+function updatePlayer(dt){
+  if(anyOverlay()){ G.player.frame=0; return; }
+  let vx=0,vy=0;
+  if(keys["w"]||keys["arrowup"])vy-=1; if(keys["s"]||keys["arrowdown"])vy+=1;
+  if(keys["a"]||keys["arrowleft"])vx-=1; if(keys["d"]||keys["arrowright"])vx+=1;
+  if(vx||vy){
+    if(Math.abs(vx)>Math.abs(vy)) G.player.dir=vx<0?"left":"right"; else G.player.dir=vy<0?"up":"down";
+    const len=Math.hypot(vx,vy)||1, sp=1.4;
+    const nx=G.player.x+vx/len*sp, ny=G.player.y+vy/len*sp, bw=10,bh=8,ox=3,oy=6;
+    if(!hits(nx+ox,G.player.y+oy,bw,bh))G.player.x=nx;
+    if(!hits(G.player.x+ox,ny+oy,bw,bh))G.player.y=ny;
+    G.player.animT+=dt; if(G.player.animT>140){G.player.frame^=1;G.player.animT=0;}
+    stepT+=dt; if(stepT>240){sfx.step();stepT=0;}
+    if(G.scene==="introRoom"&&!G.doorTriggered){ const d=interactables.find(i=>i.door);
+      if(d&&G.player.x+8>d.cx-14&&Math.abs(G.player.y+8-d.cy)<20){ G.doorTriggered=true; sfx.door();
+        fadeTo(()=>{ G.scene="plaza"; buildPlaza(); ensureLabels();
+          showIntro("THE PLAZA OF PATHS","The two nearest stalls are up ahead — walk UP the road. Glimpse a path at a stall (a few weeks), then enter its building to actually live a shift of it. Committing closes the other doors. Spend your time carefully."); }); } }
+  } else G.player.frame=0;
+}
+
+/* ================= RENDER ================= */
+function render(){
+  if(G.scene==="interior") return renderInterior();
+  drawGrass(); if(G.scene==="plaza") drawRoad();
+  for(const t of trees) drawTree(wx(t.x),wy(t.y));
+  const list=[];
+  for(const it of interactables){ if(!active(it)) continue;
+    if(it.kind==="vendor"){ list.push({y:it.cy,fn:()=>{ const P=LAYOUT.find(l=>l.id===it.path); const sc=stallCenter(P);
+      drawStall(wx(sc.x-24),wy(sc.y-24)); const vx=wx(it.x),vy=wy(it.y); drawChar(cx,vx,vy,{gender:"other",outfit:"shorts",dir:"down",frame:0});
+      cx.fillStyle=P3;cx.fillRect(vx+3,vy,10,2);cx.fillRect(vx+5,vy-2,6,2); }}); }
+    else if(it.kind==="building"){ list.push({y:it.cy,fn:()=>{ const bp=buildingPos(LAYOUT.find(l=>l.id===it.path)); drawBuilding(wx(bp.x-20),wy(bp.y),G.pathState[it.path].rung); }}); }
+    else if(it.kind==="glimpsesign"){ list.push({y:it.cy,fn:()=>drawSign(wx(it.x),wy(it.y),false)}); }
+    else if(it.kind==="cat"){ list.push({y:it.cy,fn:()=>drawSign(wx(it.x),wy(it.y),true)}); }
+    else if(it.kind==="home"){ list.push({y:it.cy,fn:()=>drawFlag(wx(it.x),wy(it.y))}); }
+    else if(it.kind==="door"){ list.push({y:it.cy,fn:()=>drawDoorProp(wx(it.x),wy(it.y))}); }
+  }
+  list.push({y:G.player.y,fn:()=>drawChar(cx,VW/2-HALF,VH/2-HALF,{gender:G.avatar.gender,outfit:G.avatar.outfit,dir:G.player.dir,frame:G.player.frame})});
+  list.sort((a,b)=>a.y-b.y).forEach(o=>o.fn());
+  const near=anyOverlay()?null:nearestActive();
+  if(near) drawPromptBubble(wx(near.cx), wy(near.y)-10);
+  if(G.scene==="plaza"){ for(const p of LAYOUT){ const sc=stallCenter(p); place(L[p.id], sc.x, sc.y-22); } }
+  else if(G.scene==="introRoom"){ place(L.__door,120,-16); }
+  if(L.__prompt){ if(near){ L.__prompt.textContent=near.label+" ▸ space"; place(L.__prompt, near.cx, near.y-22); } else L.__prompt.classList.add("hide"); }
+}
+function renderInterior(){
+  drawInteriorFloor();
+  const list=[];
+  for(const it of interactables){ if(it.kind==="station"){ list.push({y:it.cy,fn:()=>drawFurn(it.sub,wx(it.cx),wy(it.cy),it.st)}); }
+    else if(it.kind==="exit"){ list.push({y:it.cy,fn:()=>drawDoorProp(wx(it.x),wy(it.y-16))}); } }
+  list.push({y:G.player.y,fn:()=>drawChar(cx,VW/2-HALF,VH/2-HALF,{gender:G.avatar.gender,outfit:G.avatar.outfit,dir:G.player.dir,frame:G.player.frame})});
+  list.sort((a,b)=>a.y-b.y).forEach(o=>o.fn());
+  const near=anyOverlay()?null:nearestActive();
+  if(near) drawPromptBubble(wx(near.cx), wy(near.y)-12);
+  if(L.__prompt){ if(near){ L.__prompt.textContent=near.label+" ▸ space"; place(L.__prompt, near.cx, near.y-20); } else L.__prompt.classList.add("hide"); }
+}
+
+/* ================= LOOP ================= */
+let last=0;
+function loop(ts){ const dt=Math.min(40,ts-last); last=ts;
+  if(G.scene==="builder"){ bAnim+=dt; if(bAnim>420){bFrame^=1;bAnim=0;renderPreview();} }
+  else{ updatePlayer(dt);
+    if(G.scene==="interior" && G.interior && TASKS[G.interior.key].update && !anyOverlay()) TASKS[G.interior.key].update(dt);
+    updateCam(); render(); }
+  requestAnimationFrame(loop);
+}
+startBuilder(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
