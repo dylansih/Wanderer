@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>RUNWAY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+<style>
+  :root{ --p0:#e7e7dd; --p1:#9b9b90; --p2:#53534d; --p3:#1a1a17; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{ background:#0c0c0b; display:flex; align-items:center; justify-content:center;
+    min-height:100dvh; font-family:"Press Start 2P",monospace; color:var(--p3); padding:14px; }
+  #shell{ background:var(--p3); padding:14px 14px 16px; border-radius:14px;
+    box-shadow:0 0 0 2px #000, 0 24px 60px -20px #000; width:min(94vw,760px); }
+  #screen{ position:relative; width:100%; aspect-ratio:256/224; background:var(--p0);
+    overflow:hidden; border:3px solid #000; image-rendering:pixelated; }
+  #game{ position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; display:block; }
+
+  .label{ position:absolute; transform:translate(-50%,-50%); font-size:clamp(5px,1.15vw,8px);
+    color:var(--p3); background:var(--p0); padding:2px 4px; border:2px solid var(--p3);
+    white-space:nowrap; pointer-events:none; z-index:5; line-height:1; }
+  .label.door{ background:var(--p3); color:var(--p0); }
+  .label.hide{ display:none; }
+
+  .panel{ position:absolute; z-index:20; background:var(--p0); border:3px solid var(--p3);
+    box-shadow:0 0 0 3px var(--p0), 0 0 0 5px var(--p3); }
+
+  #hud{ top:6px; left:6px; right:6px; display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px; z-index:15; background:var(--p0); border:3px solid var(--p3); }
+  #hud span{ font-size:clamp(6px,1.35vw,9px); } #hud .k{ opacity:.6; }
+  #taskHud{ top:6px; left:6px; right:6px; display:none; padding:6px 8px; z-index:15;
+    background:var(--p3); color:var(--p0); font-size:clamp(6px,1.3vw,9px); text-align:center; }
+
+  #dialogue{ left:6px; right:6px; bottom:6px; padding:9px 11px 11px; z-index:25; display:none; }
+  #dlgName{ display:inline-block; font-size:clamp(6px,1.35vw,9px); background:var(--p3); color:var(--p0);
+    padding:3px 6px; margin-bottom:8px; }
+  #dlgText{ font-size:clamp(6px,1.3vw,9px); line-height:1.8; min-height:3.4em; }
+  #dlgChoices{ display:flex; flex-direction:column; gap:5px; margin-top:9px; }
+  #dlgChoices .ch{ font-size:clamp(6px,1.25vw,9px); padding:3px 4px; color:var(--p2); cursor:pointer; }
+  #dlgChoices .ch.sel{ color:var(--p3); background:var(--p1); }
+  #dlgChoices .ch.dis{ opacity:.4; }
+  #dlgHint{ margin-top:8px; font-size:clamp(5px,1.05vw,7px); color:var(--p1); text-align:right; }
+
+  .modal{ inset:6px; z-index:30; display:none; padding:14px; overflow:auto; }
+  .modal h2{ font-size:clamp(7px,1.55vw,11px); margin-bottom:12px; line-height:1.5; }
+  .modal p{ font-size:clamp(6px,1.25vw,9px); line-height:1.9; color:var(--p2); }
+  .modal .hint{ margin-top:14px; font-size:clamp(5px,1.05vw,7px); color:var(--p1); }
+
+  #builderWrap{ position:absolute; inset:6px; z-index:30; display:none; flex-direction:column;
+    padding:12px; background:var(--p0); border:3px solid var(--p3); }
+  #builderWrap h2{ font-size:clamp(7px,1.55vw,11px); text-align:center; margin-bottom:8px; }
+  #bCanvasCell{ flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+  #bCanvas{ image-rendering:pixelated; height:clamp(90px,22vw,150px); width:auto; border:2px solid var(--p3); background:var(--p1); }
+  .selector{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:7px 0; }
+  .selector .k{ font-size:clamp(6px,1.25vw,9px); } .selector .v{ font-size:clamp(6px,1.25vw,9px); color:var(--p2); flex:1; text-align:center; }
+  .arrow{ font-family:inherit; cursor:pointer; background:var(--p3); color:var(--p0); border:none; padding:5px 9px; font-size:clamp(7px,1.35vw,10px); }
+  .btn{ font-family:inherit; cursor:pointer; font-size:clamp(6px,1.25vw,9px); background:var(--p0); color:var(--p3); border:2px solid var(--p3); padding:6px 9px; }
+  .btn:hover{ background:var(--p3); color:var(--p0); }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; justify-content:center; }
+
+  #invGrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-top:4px; }
+  .slot{ aspect-ratio:1; background:var(--p0); border:2px solid var(--p3); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:4px; gap:3px; }
+  .slot.empty{ border-style:dashed; border-color:var(--p1); } .slot.sel{ background:var(--p1); }
+  .slot canvas{ image-rendering:pixelated; width:32px; height:32px; }
+  .slot .nm{ font-size:clamp(4px,0.9vw,6px); text-align:center; line-height:1.3; color:var(--p2); }
+  .sect{ margin-top:12px; }
+  .sect h3{ font-size:clamp(6px,1.25vw,9px); color:var(--p3); background:var(--p1); padding:4px 6px; margin-bottom:6px; }
+  .sect ul{ list-style:none; } .sect li{ font-size:clamp(5px,1.15vw,8px); line-height:1.9; color:var(--p2); padding-left:12px; position:relative; }
+  .sect li::before{ content:"+"; position:absolute; left:0; color:var(--p3); }
+
+  #pause{ inset:40px 26px; z-index:38; display:none; padding:16px; text-align:center; }
+  #pause h2{ font-size:clamp(8px,1.7vw,12px); margin-bottom:16px; }
+  #pause .pm{ font-size:clamp(7px,1.45vw,10px); padding:8px; color:var(--p2); cursor:pointer; }
+  #pause .pm.sel{ color:var(--p3); background:var(--p1); }
+
+  /* task overlays */
+  .task{ inset:6px; z-index:34; display:none; padding:10px; flex-direction:column; }
+  .task h2{ font-size:clamp(7px,1.45vw,10px); margin-bottom:6px; }
+  .task .cell{ flex:1; display:flex; align-items:center; justify-content:center; min-height:0; }
+  .task canvas{ image-rendering:pixelated; width:100%; height:auto; max-height:100%;
+    border:2px solid var(--p3); background:var(--p0); touch-action:none; cursor:pointer; }
+  .task .thint{ margin-top:7px; font-size:clamp(5px,1.05vw,7px); color:var(--p1); text-align:center; line-height:1.7; }
+
+  #codeWrap{ display:flex; gap:6px; margin-top:8px; }
+  #codeIn{ flex:1; font-family:inherit; font-size:clamp(6px,1.2vw,9px); padding:6px;
+    border:2px solid var(--p3); background:var(--p0); color:var(--p3); }
+  #codeIn:focus{ outline:none; background:#fff; }
+
+  #fade{ position:absolute; inset:0; z-index:50; background:#000; opacity:0; pointer-events:none; transition:opacity .55s ease; }
+  #fade.on{ opacity:1; }
+  #sndBtn{ position:absolute; bottom:6px; left:6px; z-index:16; font-family:inherit; cursor:pointer;
+    font-size:6px; background:var(--p3); color:var(--p0); border:none; padding:4px 5px; opacity:.7; }
+  #hintbar{ position:absolute; bottom:-13px; left:0; right:0; text-align:center; font-size:clamp(5px,1.05vw,7px); color:var(--p1); }
+</style>
+</head>
+<body>
+  <div id="shell">
+    <div id="screen">
+      <canvas id="game" width="256" height="224"></canvas>
+      <div id="labels"></div>
+
+      <div id="hud" class="panel" style="display:none">
+        <span><span class="k">TIME</span> <span id="hudTime">120</span></span>
+        <span id="hudPhase" class="k">DAY</span>
+        <span><span class="k">B</span> bag <span class="k">ESC</span> menu</span>
+      </div>
+      <div id="taskHud" class="panel"></div>
+
+      <div id="dialogue" class="panel">
+        <span id="dlgName">VENDOR</span>
+        <div id="dlgText"></div>
+        <div id="dlgChoices"></div>
+        <div id="dlgHint">▸ space</div>
+      </div>
+
+      <div id="intro" class="modal panel">
+        <h2 id="introTitle">A PIVOTAL POINT</h2>
+        <p id="introBody"></p>
+        <div class="hint">▸ press space</div>
+      </div>
+
+      <div id="inventory" class="modal panel">
+        <h2>YOUR BAG</h2><div id="invGrid"></div>
+        <div class="hint">arrows move · SPACE open · B/ESC close</div>
+      </div>
+      <div id="detail" class="modal panel">
+        <h2 id="detName">ITEM</h2><p id="detDesc"></p><div id="detSections"></div>
+        <div class="hint">▸ space / esc to go back</div>
+      </div>
+
+      <div id="pause" class="modal panel">
+        <h2>PAUSED</h2>
+        <div class="pm" data-i="0">RESUME</div>
+        <div class="pm" data-i="1">RESTART GAME</div>
+        <div class="hint">arrows · SPACE select</div>
+      </div>
+
+      <!-- generic mouse task canvas -->
+      <div id="mtask" class="task panel">
+        <h2 id="mtTitle">TASK</h2>
+        <div class="cell"><canvas id="mtCanvas" width="236" height="150"></canvas></div>
+        <div class="thint" id="mtHint">drag with the mouse</div>
+      </div>
+
+      <!-- typing task -->
+      <div id="ttask" class="task panel">
+        <h2 id="ttTitle">MAKE IT RUN</h2>
+        <div class="cell"><canvas id="ttCanvas" width="236" height="120"></canvas></div>
+        <div id="codeWrap"><input id="codeIn" type="text" autocomplete="off" spellcheck="false" placeholder="type the fixed line..." /><button class="btn" id="codeGo">RUN</button></div>
+        <div class="thint" id="ttHint">rewrite the broken line correctly, then RUN</div>
+      </div>
+
+      <div id="builderWrap">
+        <h2>CREATE YOURSELF</h2>
+        <div id="bCanvasCell"><canvas id="bCanvas" width="64" height="64"></canvas></div>
+        <div class="selector"><button class="arrow" data-k="gender" data-d="-1">◀</button>
+          <span class="k">BODY</span><span class="v" id="vGender">man</span>
+          <button class="arrow" data-k="gender" data-d="1">▶</button></div>
+        <div class="selector"><button class="arrow" data-k="outfit" data-d="-1">◀</button>
+          <span class="k">FIT</span><span class="v" id="vOutfit">t-shirt & shorts</span>
+          <button class="arrow" data-k="outfit" data-d="1">▶</button></div>
+        <div class="row"><button class="btn" id="builderOk" style="font-size:clamp(7px,1.45vw,10px)">▸ THIS IS ME</button></div>
+      </div>
+
+      <button id="sndBtn">♪ ON</button>
+      <div id="fade"></div>
+    </div>
+    <div id="hintbar">WASD / arrows move &nbsp;·&nbsp; SPACE interact &nbsp;·&nbsp; mouse in tasks</div>
+  </div>
+
+<script>
+/* ================= RUNWAY — pass 4 =================
+   Act I  : explore paths, spend finite weeks, pick a place to START.
+   Act II : work the field, hit a crossroads, deepen / switch / stay.
+   Thesis : time is finite, but choosing is not permanent. Skills transfer.
+==================================================== */
+const P0="#e7e7dd",P1="#9b9b90",P2="#53534d",P3="#1a1a17";
+const cv=document.getElementById("game"), cx=cv.getContext("2d"); cx.imageSmoothingEnabled=false;
+const VW=256, VH=224, HALF=8;
+const el=id=>document.getElementById(id);
+
+/* ---------- audio ---------- */
+let sndOn=true, actx=null;
+function AC(){ actx=actx||new(window.AudioContext||window.webkitAudioContext)(); return actx; }
+function blip(f,dur=0.08,type="square",vol=0.05,to=null){
+  if(!sndOn)return;
+  try{ const a=AC(),o=a.createOscillator(),g=a.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,a.currentTime);
+    if(to)o.frequency.linearRampToValueAtTime(to,a.currentTime+dur);
+    g.gain.value=vol;o.connect(g);g.connect(a.destination);o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+dur);o.stop(a.currentTime+dur+0.02);
+  }catch(e){}
+}
+function noiseHit(dur=0.06,vol=0.05){
+  if(!sndOn)return;
+  try{ const a=AC(),n=a.createBufferSource(),b=a.createBuffer(1,Math.max(1,a.sampleRate*dur),a.sampleRate);
+    const d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    n.buffer=b; const g=a.createGain(); g.gain.value=vol; n.connect(g); g.connect(a.destination);
+    n.start(); g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+dur); n.stop(a.currentTime+dur+0.02);
+  }catch(e){}
+}
+const sfx={
+  select:()=>blip(520,0.05), confirm:()=>{blip(440,0.06);setTimeout(()=>blip(660,0.09),60);},
+  buy:()=>{blip(523,0.06);setTimeout(()=>blip(659,0.06),70);setTimeout(()=>blip(784,0.12),140);},
+  deny:()=>blip(150,0.16,"sawtooth"),
+  commit:()=>[392,523,659,784].forEach((f,i)=>setTimeout(()=>blip(f,0.16),i*110)),
+  door:()=>blip(330,0.12,"square",0.04,180), step:()=>blip(700,0.008,"square",0.012),
+  good:()=>{blip(660,0.06);setTimeout(()=>blip(880,0.1),70);}, bad:()=>blip(120,0.2,"sawtooth"),
+  pick:()=>blip(420,0.04), drop:()=>blip(600,0.05),
+  kick:()=>blip(95,0.15,"sine",0.09,55), snare:()=>{noiseHit(0.08,0.05);blip(180,0.06,"triangle",0.03);},
+  hat:()=>noiseHit(0.03,0.03), heal:()=>{blip(500,0.05);setTimeout(()=>blip(720,0.08),50);},
+  crash:()=>blip(90,0.4,"sawtooth",0.06,40)
+};
+el("sndBtn").onclick=e=>{sndOn=!sndOn;e.target.textContent=sndOn?"♪ ON":"♪ OFF";};
+
+/* ---------- mouse helper ---------- */
+function canvasPos(canvas,e){
+  const r=canvas.getBoundingClientRect();
+  const cxp=(e.clientX!=null?e.clientX:(e.touches&&e.touches[0].clientX));
+  const cyp=(e.clientY!=null?e.clientY:(e.touches&&e.touches[0].clientY));
+  return { x:(cxp-r.left)*(canvas.width/r.width), y:(cyp-r.top)*(canvas.height/r.height) };
+}
+function bindPointer(canvas,h){
+  canvas.onpointerdown=e=>{ e.preventDefault(); try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+    if(h.down)h.down(canvasPos(canvas,e)); };
+  canvas.onpointermove=e=>{ if(h.move)h.move(canvasPos(canvas,e)); };
+  canvas.onpointerup=e=>{ if(h.up)h.up(canvasPos(canvas,e)); };
+}
+function hit(p,r){ return p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h; }
+function txt(ctx,s,x,y,size,color){ ctx.fillStyle=color||P3; ctx.font=(size||7)+"px 'Press Start 2P'"; ctx.fillText(s,x,y); }
+function wrapTxt(ctx,s,x,y,size,maxChars,lh,color){
+  const words=s.split(" "); let line=""; let yy=y;
+  for(const w of words){ if((line+w).length>maxChars){ txt(ctx,line,x,yy,size,color); yy+=lh; line=w+" "; } else line+=w+" "; }
+  if(line.trim()) txt(ctx,line,x,yy,size,color); return yy;
+}
+
+/* ================= SPRITES ================= */
+function drawChar(ctx,ox,oy,o){
+  const flip=o.dir==="right", dir=flip?"left":o.dir, f=o.frame||0;
+  const put=(x,y,w,h,c)=>{const X=flip?(16-(x+w)):x;ctx.fillStyle=c;ctx.fillRect(ox+X,oy+y,w,h);};
+  const SKIN=P0,HAIR=P3,CLOTH=o.cloth||P2,DARK=P3;
+  ctx.fillStyle=P1;ctx.fillRect(ox+4,oy+15,8,1);
+  if(dir==="down"||dir==="up"){
+    put(5,2,6,4,SKIN); put(4,1,8,2,HAIR);
+    if(o.gender==="man"){put(4,3,1,1,HAIR);put(11,3,1,1,HAIR);}
+    if(o.gender==="other"){put(4,3,1,3,HAIR);put(11,3,1,3,HAIR);}
+    if(o.gender==="woman"){put(4,3,1,5,HAIR);put(11,3,1,5,HAIR);}
+    if(dir==="up"){put(5,2,6,3,HAIR);} else {put(5,2,6,1,HAIR);put(6,4,1,1,DARK);put(9,4,1,1,DARK);}
+    put(5,6,6,4,CLOTH); put(4,6,1,3,SKIN);put(11,6,1,3,SKIN);put(4,9,1,1,SKIN);put(11,9,1,1,SKIN);
+    if(o.outfit==="dress"){ put(5,10,6,1,CLOTH);put(4,11,8,1,CLOTH);put(4,12,8,1,CLOTH);
+      put(5,13,2,1,SKIN);put(9,13,2,1,SKIN);put(5,14,2,1,DARK);put(9,14,2,1,DARK);
+    }else{ put(5,10,6,2,DARK);put(5,12,2,2,SKIN);put(9,12,2,2,SKIN);
+      put(5,14,2,1,DARK);put(9,14,2,1,DARK); if(f)put(5,13,2,1,SKIN); }
+  }else{
+    put(6,2,5,4,SKIN);put(6,1,5,2,HAIR);put(9,3,2,3,HAIR);
+    if(o.gender==="woman")put(9,3,2,5,HAIR); if(o.gender==="other")put(9,3,2,4,HAIR);
+    put(6,4,1,1,DARK); put(6,6,4,4,CLOTH);
+    if(f)put(6,7,1,3,SKIN);else put(9,7,1,3,SKIN);
+    if(o.outfit==="dress"){ put(6,10,4,1,CLOTH);put(5,11,5,2,CLOTH);
+      if(f){put(6,13,2,1,SKIN);put(6,14,2,1,DARK);}else{put(8,13,2,1,SKIN);put(8,14,2,1,DARK);}
+    }else{ put(6,10,4,2,DARK);
+      if(f){put(6,12,2,2,SKIN);put(6,14,2,1,DARK);put(8,12,2,2,SKIN);}
+      else{put(8,12,2,2,SKIN);put(8,14,2,1,DARK);put(6,12,2,2,SKIN);} }
+  }
+}
+function drawIcon(ctx,rung){
+  ctx.clearRect(0,0,16,16); const put=(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x,y,w,h);};
+  if(rung===0){ put(3,7,10,3,P3);put(6,6,4,5,P0);put(7,7,2,3,P3); }
+  else if(rung===1){ put(6,2,4,1,P3);put(7,3,2,3,P2);put(4,6,8,7,P2);put(4,12,8,2,P3);put(6,9,1,1,P0); }
+  else if(rung===2){ put(7,2,2,3,P3);put(4,5,8,5,P2);put(6,10,4,3,P3);put(7,6,2,2,P0); }
+  else { put(3,3,10,2,P3);put(3,11,10,2,P3);put(4,5,8,6,P0);put(5,7,6,1,P2);put(5,9,6,1,P2);put(3,3,2,10,P3);put(11,3,2,10,P3); }
+}
+function drawStall(sx,sy){
+  for(let i=0;i<48;i+=6){ cx.fillStyle=(i/6)%2===0?P3:P2; cx.fillRect(sx+i,sy,6,7); }
+  cx.fillStyle=P3;cx.fillRect(sx,sy+7,48,1);
+  cx.fillStyle=P2;cx.fillRect(sx,sy+8,2,24);cx.fillRect(sx+46,sy+8,2,24);
+  cx.fillStyle=P1;cx.fillRect(sx+2,sy+26,44,6);cx.fillStyle=P3;cx.fillRect(sx+2,sy+26,44,1);
+}
+function drawSign(sx,sy,tall){ const h=tall?12:10;
+  cx.fillStyle=P3;cx.fillRect(sx+3,sy,2,16); cx.fillStyle=P2;cx.fillRect(sx-4,sy-2,16,h);
+  cx.fillStyle=P3;cx.fillRect(sx-4,sy-2,16,1);cx.fillRect(sx-4,sy-3+h,16,1);
+  cx.fillStyle=P0;cx.fillRect(sx-2,sy,3,1);cx.fillRect(sx-2,sy+3,8,1);cx.fillRect(sx-2,sy+6,6,1); }
+function drawFlag(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx+2,sy,2,16); cx.fillStyle=P2;cx.fillRect(sx+4,sy,10,7);cx.fillStyle=P3;cx.fillRect(sx+4,sy,10,1); }
+function drawTree(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx+6,sy+12,3,6); cx.fillStyle=P2;cx.fillRect(sx+2,sy,11,13);
+  cx.fillStyle=P1;cx.fillRect(sx+4,sy+2,3,3);cx.fillRect(sx+8,sy+6,3,3); cx.fillStyle=P3;cx.fillRect(sx+2,sy,11,1);cx.fillRect(sx+2,sy+12,11,1); }
+function drawDoorProp(sx,sy){ cx.fillStyle=P3;cx.fillRect(sx,sy,20,34); cx.fillStyle=P2;cx.fillRect(sx+2,sy+2,16,30);
+  cx.fillStyle=P0;cx.fillRect(sx+4,sy+4,12,26); cx.fillStyle=P3;cx.fillRect(sx+12,sy+16,3,3); }
+
+/* ---------- DISTINCT BUILDINGS ---------- */
+function bHospital(sx,sy,r){ // tall, pale, cross, ambulance bay
+  const h=34+r*7, w=46;
+  cx.fillStyle=P0; cx.fillRect(sx,sy-h,w,h);
+  cx.fillStyle=P3; cx.strokeStyle=P3;
+  cx.fillRect(sx,sy-h,w,2); cx.fillRect(sx,sy-2,w,2); cx.fillRect(sx,sy-h,2,h); cx.fillRect(sx+w-2,sy-h,2,h);
+  // window grid (clinical, regular)
+  cx.fillStyle=P2;
+  for(let ry=0;ry<Math.min(4,1+r);ry++) for(let c=0;c<4;c++) cx.fillRect(sx+6+c*10,sy-h+7+ry*9,6,5);
+  // red cross block
+  cx.fillStyle=P3; cx.fillRect(sx+w/2-6,sy-h-9,12,9);
+  cx.fillStyle=P0; cx.fillRect(sx+w/2-1,sy-h-7,2,6); cx.fillRect(sx+w/2-4,sy-h-5,8,2);
+  // ambulance bay canopy
+  cx.fillStyle=P2; cx.fillRect(sx-6,sy-15,10,3); cx.fillStyle=P3; cx.fillRect(sx-6,sy-15,10,1);
+  // sliding doors
+  cx.fillStyle=P2; cx.fillRect(sx+w/2-7,sy-13,14,13);
+  cx.fillStyle=P0; cx.fillRect(sx+w/2-6,sy-12,5,12); cx.fillRect(sx+w/2+1,sy-12,5,12);
+  cx.fillStyle=P3; cx.fillRect(sx+w/2-1,sy-13,2,13);
+}
+function bGarage(sx,sy,r){ // low, wide, corrugated, roll-up door
+  const h=22+r*4, w=52;
+  cx.fillStyle=P2; cx.fillRect(sx,sy-h,w,h);
+  cx.fillStyle=P3; cx.fillRect(sx,sy-h,w,1); cx.fillRect(sx,sy-1,w,1);
+  // corrugation
+  cx.fillStyle=P1; for(let i=2;i<w;i+=4) cx.fillRect(sx+i,sy-h+2,1,h-4);
+  // slanted roof
+  cx.fillStyle=P3; cx.fillRect(sx-4,sy-h-4,w+8,4); cx.fillStyle=P2; cx.fillRect(sx-4,sy-h-4,w+8,1);
+  // roll-up door (segments)
+  cx.fillStyle=P3; cx.fillRect(sx+10,sy-16,22,16);
+  cx.fillStyle=P1; for(let i=0;i<4;i++) cx.fillRect(sx+11,sy-15+i*4,20,3);
+  // one lit window, junk outside
+  cx.fillStyle=P0; cx.fillRect(sx+38,sy-14,8,7);
+  cx.fillStyle=P3; cx.fillRect(sx+40,sy-14,1,7);
+  cx.fillStyle=P3; cx.fillRect(sx+w+2,sy-4,5,4); cx.fillRect(sx-6,sy-3,4,3);
+}
+function bStudio(sx,sy,r){ // dark box, no windows, neon sign, baffles
+  const h=28+r*5, w=42;
+  cx.fillStyle=P3; cx.fillRect(sx,sy-h,w,h);
+  cx.fillStyle=P2; cx.fillRect(sx+2,sy-h+2,w-4,h-4);
+  // sound baffle diagonals
+  cx.fillStyle=P3; for(let i=0;i<w;i+=6) cx.fillRect(sx+i,sy-h+4,2,h-8);
+  // marquee / neon bar
+  cx.fillStyle=P0; cx.fillRect(sx+5,sy-h-6,w-10,6);
+  cx.fillStyle=P3; cx.fillRect(sx+7,sy-h-4,3,2); cx.fillRect(sx+12,sy-h-4,3,2); cx.fillRect(sx+17,sy-h-4,3,2);
+  // heavy door + speaker box
+  cx.fillStyle=P0; cx.fillRect(sx+w/2-6,sy-14,12,14);
+  cx.fillStyle=P3; cx.fillRect(sx+w/2-4,sy-12,8,12); cx.fillStyle=P1; cx.fillRect(sx+w/2+1,sy-7,2,2);
+  cx.fillStyle=P2; cx.fillRect(sx+w+1,sy-10,6,10); cx.fillStyle=P3; cx.fillRect(sx+w+2,sy-8,4,4);
+}
+function bLab(sx,sy,r){ // concrete slab, narrow slit windows, vents
+  const h=30+r*5, w=44;
+  cx.fillStyle=P1; cx.fillRect(sx,sy-h,w,h);
+  cx.fillStyle=P3; cx.fillRect(sx,sy-h,w,1); cx.fillRect(sx,sy-1,w,1); cx.fillRect(sx,sy-h,1,h); cx.fillRect(sx+w-1,sy-h,1,h);
+  // concrete seams
+  cx.fillStyle=P2; cx.fillRect(sx,sy-h+11,w,1); cx.fillRect(sx,sy-h+22,w,1);
+  // narrow slit windows
+  cx.fillStyle=P3; for(let c=0;c<Math.min(5,2+r);c++) cx.fillRect(sx+5+c*8,sy-h+4,3,6);
+  // roof vents / ducts
+  cx.fillStyle=P2; cx.fillRect(sx+6,sy-h-6,8,6); cx.fillRect(sx+22,sy-h-8,7,8);
+  cx.fillStyle=P3; cx.fillRect(sx+6,sy-h-6,8,1); cx.fillRect(sx+22,sy-h-8,7,1);
+  // door with keycard panel
+  cx.fillStyle=P2; cx.fillRect(sx+w/2-6,sy-13,12,13);
+  cx.fillStyle=P3; cx.fillRect(sx+w/2-4,sy-11,8,11);
+  cx.fillStyle=P0; cx.fillRect(sx+w/2+6,sy-9,2,3);
+}
+const BUILDING_ART={med:bHospital,build:bGarage,sound:bStudio,research:bLab};
+
+/* ---------- interior furniture ---------- */
+function drawFurn(sub,sx,sy,st){
+  const put=(x,y,w,h,c)=>{cx.fillStyle=c;cx.fillRect(sx+x,sy+y,w,h);};
+  if(sub==="bed"){
+    put(-2,-2,20,14,P0); put(-2,-2,20,1,P3);put(-2,11,20,1,P3);put(-2,-2,1,14,P3);put(17,-2,1,14,P3);
+    put(1,1,14,4,P1);
+    const lvl=st&&st.lvl!=null?st.lvl:100;
+    put(-2,-8,20,4,P3); const w=Math.max(0,Math.round(18*lvl/100)); put(-1,-7,w,2,P0);
+    if(st&&st.lost){ put(4,3,10,1,P3); }
+  } else if(sub==="bug"){
+    put(-2,-6,20,12,P2); put(-2,-6,20,1,P3);put(-2,5,20,1,P3); put(6,6,4,3,P3);
+    if(st&&st.fixed){ put(0,-4,16,8,P0); put(4,-1,3,2,P3);put(9,-1,3,2,P3); }
+    else { for(let i=0;i<16;i+=3){put(i-2,-4+((i%2)?2:0),2,2,P3);} }
+  } else if(sub==="desk"||sub==="terminal"||sub==="ship"||sub==="bench"||sub==="console"||sub==="patient"){
+    if(sub==="patient"){ drawChar(cx,sx-8,sy-10,{gender:"other",outfit:"dress",dir:"down",frame:0}); if(st&&st.done){put(-2,-16,4,4,P3);} return; }
+    if(sub==="bench"){ put(-6,-4,28,4,P3); put(-4,0,24,8,P2); put(-4,7,24,1,P3);
+      put(0,-9,3,5,P0); put(6,-10,3,6,P0); put(12,-9,3,5,P0); return; }
+    if(sub==="console"){ put(-6,-2,30,10,P2); put(-6,-2,30,1,P3);put(-6,7,30,1,P3);
+      for(let i=0;i<6;i++){ put(-3+i*5,0,1,6,P0); put(-3+i*5,1+(i%3),3,1,P3);} return; }
+    put(-2,-7,20,5,P3); put(0,-5,16,3,P0);
+    if(st&&st.red){ put(0,-5,16,3,P3); }
+    put(-1,-2,18,10,P2); put(-1,7,18,1,P3);
+    if(sub==="ship"){ put(4,-6,8,1,P0); }
+  }
+}
+/* interior themes: floor pattern + wall tone per path */
+const THEME={
+  med:      {floor:P0, grid:P1, wall:P0, trim:P2, note:"tile"},
+  build:    {floor:P1, grid:P2, wall:P2, trim:P3, note:"concrete"},
+  sound:    {floor:P2, grid:P3, wall:P3, trim:P2, note:"carpet"},
+  research: {floor:P0, grid:P2, wall:P1, trim:P3, note:"epoxy"}
+};
+
+/* ================= CONTENT ================= */
+const START_TIME=120;
+const COST={glimpse:4,micro:14,deep:34};
+const PATHS={
+  med:{name:"MEDICINE",tag:"the approved door",building:"HOSPITAL",role:"resident physician",
+    pitch:["\"Medicine. Everyone nods when you say it.\"","\"Years of your life — and the weight of other people's outcomes in your hands.\""],
+    rungs:[
+      {item:"Hospital Badge",desc:"5 a.m. corridor, the light too clean. A chart in your hands, the room waiting on what you'll say."},
+      {item:"Scribe's Pen",desc:"You triaged a full waiting room. Getting it right meant seeing who was quietly dying under a calm face."},
+      {item:"White Coat",desc:"A night shift where more people needed you than there was of you. That arithmetic never stops being yours."}],
+    skill:{key:"triage",label:"Triage under pressure",transfer:"deciding what matters first when everything is urgent"},
+    demands:["Patients","Charting & admin","Teaching residents","Sleep & the people who love you"],
+    scroll:{item:"Physician's Scroll",peak:"You chose the weight on purpose.",
+      sections:{"CLASSES":["Intro bio + lab, gen & organic chem","Physics, biochem, statistics","Psych & sociology (on the MCAT)"],
+        "SKILLS":["Memorization stamina over years","Clinical empathy under exhaustion","Tolerating delayed payoff"],
+        "WAYS IN":["Hospital volunteering; EMT/CNA cert","Medical scribing for exposure","Shadow a physician; clinical lab RA"],
+        "REACH OUT":["Pre-health advising office first","Physicians via family / alumni","MD & MD/PhD students"]}}},
+  build:{name:"BUILDING",tag:"the cheap door",building:"THE GARAGE",role:"software engineer",
+    pitch:["\"Building. Software, startups, things that ship.\"","\"Cheap to enter — and the doors stay open behind you.\""],
+    rungs:[
+      {item:"Floppy Disk",desc:"2 a.m. You hunted a bug through your own code, found the one wrong line, and the thing finally ran."},
+      {item:"Hackathon Tag",desc:"You shipped it against a countdown, because done beats perfect and the room was waiting."},
+      {item:"Mech Keyboard",desc:"You've shipped enough that your skills follow you anywhere. Betting here costs less than almost anywhere."}],
+    skill:{key:"debug",label:"Debugging persistence",transfer:"staying with a problem past the point it stops being fun"},
+    demands:["Ship features","Pay down tech debt","Meetings & recruiting","Sleep & the people who love you"],
+    scroll:{item:"Builder's Scroll",peak:"You could just build the door instead of waiting at one.",
+      sections:{"CLASSES":["Intro CS (CS50 free), data structures","Linear algebra + a systems course","Most of it is self-teachable"],
+        "SKILLS":["Shipping unfinished things publicly","Debugging persistence","Reading docs & source, not courses"],
+        "WAYS IN":["One real project on GitHub this month","Hackathons; contribute to OSS","YC Startup School (free); intern early"],
+        "REACH OUT":["Founders on X/LinkedIn — cold works","Campus build club & meetups","Anyone shipping what you admire"]}}},
+  sound:{name:"SOUND",tag:"the risky door",building:"THE STUDIO",role:"producer",
+    pitch:["\"Sound. Make things people feel — maybe get paid.\"","\"A skill forever. A living? The door is narrow.\""],
+    rungs:[
+      {item:"Cassette Tape",desc:"You built a groove from nothing and something in your chest unlocked when it locked in."},
+      {item:"Guitar Pick",desc:"You mixed it until it sat in the pocket. The difference between 'fine' and 'right' was the whole job."},
+      {item:"Studio Key",desc:"Good enough now that the only question left is the economics. You can see exactly how narrow the door is."}],
+    skill:{key:"ear",label:"Taste and a trained ear",transfer:"noticing the small difference between fine and right"},
+    demands:["Make new work","Paid session work","Promo & audience","Sleep & the people who love you"],
+    scroll:{item:"Composer's Scroll",peak:"You bet on the thing that unlocked your chest, knowing the math.",
+      sections:{"CLASSES":["Music theory + ear training","Audio production in a real DAW","One business-of-music course"],
+        "SKILLS":["Output when no one's asking","Taste; nerve to share early","Metabolizing rejection"],
+        "WAYS IN":["Release on streaming; open-mic rooms","Sync/licensing for early income","One track a week, publicly"],
+        "REACH OUT":["Local musicians, campus radio","Producers whose sound you'd study","Open-mic & DIY-venue scenes"]}}},
+  research:{name:"RESEARCH",tag:"the slow door",building:"THE LAB",role:"researcher",
+    pitch:["\"Research. Sit with one question for years.\"","\"Reversible early. The PhD is a long, quiet bet.\""],
+    rungs:[
+      {item:"Lab Notebook",desc:"A result that wouldn't replicate. The skill wasn't brilliance — it was changing one variable at a time."},
+      {item:"Petri Dish",desc:"You ran the same question into the dark, trial after noisy trial, until a signal rose out of the scatter."},
+      {item:"Journal Paper",desc:"Five, six years with one question while the world moves. People find out who they are through the waiting."}],
+    skill:{key:"method",label:"Isolating one variable",transfer:"finding the real cause instead of guessing at everything"},
+    demands:["Experiments","Writing & grants","Mentoring students","Sleep & the people who love you"],
+    scroll:{item:"Scholar's Scroll",peak:"You chose the slow question over the fast ones on purpose.",
+      sections:{"CLASSES":["Field intro sequence + heavy math/stats","Research methods early","Scientific writing — the bottleneck"],
+        "SKILLS":["Tolerance for slow payoff","Deep focus; reading papers","Being usefully wrong"],
+        "WAYS IN":["Undergrad RA — email PIs","Summer REU program","Undergrad poster session"],
+        "REACH OUT":["Professors — office hours on-ramp","Grad students in labs you like","PIs whose papers you enjoyed"]}}}
+};
+const CATS=["CLASSES","SKILLS","WAYS IN","REACH OUT"];
+const LAYOUT=[{id:"med",side:-1,slot:0},{id:"build",side:1,slot:0},{id:"sound",side:-1,slot:1},{id:"research",side:1,slot:1}];
+/* Act II specializations within each industry */
+const SPECIALIZE={
+  med:{name:"EMERGENCY MEDICINE",line:"You went where the triage instinct was sharpest. Same field, narrower blade."},
+  build:{name:"INFRASTRUCTURE",line:"You stopped shipping features and started building what features stand on."},
+  sound:{name:"SCORING FOR FILM",line:"You aimed the ear at picture. Same craft, a room that pays for it."},
+  research:{name:"COMPUTATIONAL BIOLOGY",line:"You took the method somewhere the questions got bigger."}
+};
+
+/* ================= STATE ================= */
+function freshState(){
+  return { scene:"builder", time:START_TIME, avatar:{gender:"man",outfit:"shorts"},
+    pathState:{med:{rung:0},build:{rung:0},sound:{rung:0},research:{rung:0}},
+    committed:null, inventory:[], skills:[], journey:[],
+    player:{x:0,y:95,dir:"up",frame:0,animT:0}, cam:{x:0,y:0},
+    doorTriggered:false, interior:null, act:1, careerStage:0, years:0, ending:null };
+}
+let G=freshState();
+let interactables=[], solids=[], trees=[];
+function anyOverlay(){
+  return el("intro").style.display==="block"||el("inventory").style.display==="block"
+    ||el("detail").style.display==="block"||el("pause").style.display==="block"||dlg.open
+    ||el("builderWrap").style.display==="flex"||el("mtask").style.display==="flex"||el("ttask").style.display==="flex";
+}
+function addSkill(s){ if(!G.skills.find(k=>k.key===s.key)) G.skills.push(s); }
+
+/* ================= DAY / NIGHT ================= */
+const PHASES=[{n:"MORNING",a:0.00},{n:"AFTERNOON",a:0.06},{n:"DUSK",a:0.20},{n:"NIGHT",a:0.34}];
+function phaseIdx(){ const spent=START_TIME-G.time; return Math.max(0,Math.min(3,Math.floor(spent/(START_TIME/4)))); }
+function applyTint(){ const p=PHASES[phaseIdx()]; if(p.a<=0)return;
+  cx.save(); cx.globalAlpha=p.a; cx.fillStyle=P3; cx.fillRect(0,0,VW,VH); cx.restore(); }
+
+/* ================= PLAZA ================= */
+function slotY(slot){ return -slot*150; }
+function stallCenter(p){ return {x:p.side*74, y:slotY(p.slot)-22}; }
+function vendorPos(p){ return {x:p.side*30, y:slotY(p.slot)}; }
+function buildingPos(p){ return {x:p.side*152, y:slotY(p.slot)+6}; }
+
+function buildPlaza(spawnPath){
+  G.scene="plaza"; interactables=[]; solids=[]; trees=[];
+  for(const p of LAYOUT){
+    const sc=stallCenter(p), vp=vendorPos(p), P=PATHS[p.id], bp=buildingPos(p);
+    solids.push({x:sc.x-24,y:sc.y-16,w:48,h:24});
+    interactables.push({kind:"vendor",path:p.id,x:vp.x-8,y:vp.y-8,w:16,h:16,cx:vp.x,cy:vp.y,label:P.name});
+    const gsx=p.side*100;
+    interactables.push({kind:"glimpsesign",path:p.id,x:gsx-8,y:slotY(p.slot)-8,w:16,h:20,cx:gsx,cy:slotY(p.slot),label:P.rungs[0].item});
+    solids.push({x:bp.x-24,y:bp.y-30,w:50,h:24});
+    interactables.push({kind:"building",path:p.id,x:bp.x-6,y:bp.y-14,w:12,h:16,cx:bp.x,cy:bp.y-2,label:P.building});
+    trees.push({x:p.side*228,y:slotY(p.slot)-42});
+  }
+  trees.push({x:-44,y:200},{x:44,y:212},{x:-120,y:150},{x:120,y:150});
+  if(spawnPath){ const vp=vendorPos(LAYOUT.find(l=>l.id===spawnPath)); G.player.x=vp.x; G.player.y=vp.y+42; G.player.dir="up"; }
+  else { G.player.x=0; G.player.y=95; G.player.dir="up"; }
+  el("hud").style.display="flex"; el("taskHud").style.display="none"; updateHUD();
+}
+function buildIntroRoom(){
+  G.scene="introRoom"; interactables=[]; solids=[]; trees=[{x:-70,y:-40},{x:80,y:60},{x:-90,y:70}];
+  interactables.push({kind:"door",x:110,y:-18,w:20,h:36,cx:120,cy:0,label:"LIFE",door:true,always:true});
+  G.player.x=0;G.player.y=0;G.player.dir="right"; G.doorTriggered=false;
+  el("hud").style.display="none"; el("taskHud").style.display="none";
+}
+function active(it){
+  if(it.always) return true;
+  if(it.kind==="vendor"||it.kind==="door"||it.kind==="workplace"||it.kind==="crossroad") return true;
+  if(it.kind==="glimpsesign"||it.kind==="building") return G.pathState[it.path].rung>=1;
+  return false;
+}
+
+/* ================= ACT II WORLD ================= */
+function buildCareer(){
+  G.scene="career"; interactables=[]; solids=[]; trees=[];
+  const P=PATHS[G.committed];
+  interactables.push({kind:"workplace",path:G.committed,x:-6,y:-40,w:12,h:16,cx:0,cy:-30,label:P.building});
+  solids.push({x:-26,y:-70,w:52,h:28});
+  trees.push({x:-110,y:-20},{x:110,y:-10},{x:-90,y:70},{x:95,y:80});
+  if(G.careerStage>=1){
+    interactables.push({kind:"crossroad",which:"deeper",x:-118,y:22,w:16,h:20,cx:-110,cy:30,label:"GO DEEPER"});
+    interactables.push({kind:"crossroad",which:"sideways",x:102,y:22,w:16,h:20,cx:110,cy:30,label:"GO SIDEWAYS"});
+    interactables.push({kind:"crossroad",which:"stay",x:-8,y:72,w:16,h:20,cx:0,cy:80,label:"STAY HERE"});
+  }
+  G.player.x=0; G.player.y=10; G.player.dir="up";
+  el("hud").style.display="flex"; el("taskHud").style.display="none"; updateHUD();
+}
+
+/* ================= INTERIOR ================= */
+const IW=220, IH=180;
+function roomWalls(){ const W=IW,H=IH; return [
+  {x:-W/2,y:-H/2,w:W,h:10},{x:-W/2,y:H/2-10,w:W,h:10},
+  {x:-W/2,y:-H/2,w:10,h:H},{x:W/2-10,y:-H/2,w:10,h:H} ]; }
+function buildInterior(path,mode){
+  G.scene="interior";
+  const key=path+"_"+mode;
+  G.interior={path,mode,key,phase:"active",t:{}};
+  interactables=[]; solids=roomWalls(); trees=[];
+  interactables.push({kind:"exit",x:-8,y:IH/2-26,w:16,h:20,cx:0,cy:IH/2-16,label:"leave",always:true});
+  G.player.x=0; G.player.y=IH/2-36; G.player.dir="up";
+  el("hud").style.display="none"; el("taskHud").style.display="block"; el("taskHud").textContent=TASKS[key].title;
+  TASKS[key].init();
+  showIntro(TASKS[key].title, TASKS[key].brief);
+}
+function addStation(sub,x,y,label,extra){
+  const s={kind:"station",sub,x:x-8,y:y-8,w:16,h:16,cx:x,cy:y,label,always:true,st:extra||{}};
+  interactables.push(s); return s;
+}
+
+/* ================= TASKS ================= */
+const TASKS={};
+
+/* --- MED micro: drag-and-drop triage --- */
+TASKS.med_micro={ title:"ER TRIAGE", brief:"Read each patient, then drag their card into an acuity bin. The dangerous mistake is under-triaging someone who looks calm. Walk to the triage desk to begin.",
+  init(){ addStation("patient",-58,-42,"BED 1",{i:0}); addStation("patient",0,-56,"BED 2",{i:1});
+    addStation("patient",58,-42,"BED 3",{i:2}); addStation("desk",0,14,"TRIAGE DESK",{desk:true}); },
+  onStation(s){ if(s.sub==="patient"){ const p=TRIAGE_CARDS[s.st.i]; s.st.done=true; openDialogue(p.name,[p.pres]); }
+    else openTriage(); } };
+const TRIAGE_CARDS=[
+  {name:"BED 1 — man, 58",short:"58M chest pain",pres:"Crushing chest pain, sweating, gray. Clutching his left arm, barely finishing sentences.",correct:0,why:"Classic cardiac. Minutes matter."},
+  {name:"BED 2 — woman, 24",short:"24F ankle",pres:"Rolled her ankle at intramurals. Walked in, laughing, icing it herself.",correct:2,why:"Stable, ambulatory, no red flags."},
+  {name:"BED 3 — kid, 6",short:"6yo fever",pres:"High fever, floppy, breathing fast, not tracking you. Parents terrified.",correct:1,why:"Sick child, altered — can't wait long."}
+];
+const BINS=["IMMEDIATE","URGENT","MINOR"];
+let tri={place:[null,null,null],drag:null,dx:0,dy:0,done:false};
+function openTriage(){
+  tri={place:[null,null,null],drag:null,dx:0,dy:0,done:false};
+  el("mtTitle").textContent="ASSIGN ACUITY";
+  el("mtHint").textContent="drag each card into a bin · every card must be placed";
+  el("mtask").style.display="flex";
+  bindPointer(el("mtCanvas"),{
+    down:p=>{ for(let i=2;i>=0;i--){ const r=cardRect(i); if(tri.place[i]===null&&hit(p,r)){ tri.drag=i; tri.dx=p.x-r.x; tri.dy=p.y-r.y; tri.pos={x:r.x,y:r.y}; sfx.pick(); return; } }
+      if(tri.done&&hit(p,{x:150,y:126,w:80,h:18})) finishTriage(); },
+    move:p=>{ if(tri.drag!=null){ tri.pos={x:p.x-tri.dx,y:p.y-tri.dy}; drawTriage(); } },
+    up:p=>{ if(tri.drag==null)return;
+      for(let b=0;b<3;b++){ if(hit(p,binRect(b))){ tri.place[tri.drag]=b; sfx.drop(); break; } }
+      tri.drag=null; tri.done=tri.place.every(v=>v!==null); drawTriage(); }
+  });
+  drawTriage();
+}
+function cardRect(i){ if(tri.drag===i&&tri.pos) return {x:tri.pos.x,y:tri.pos.y,w:64,h:22};
+  if(tri.place[i]!==null){ const b=binRect(tri.place[i]); const stack=tri.place.slice(0,i).filter(v=>v===tri.place[i]).length;
+    return {x:b.x+3,y:b.y+16+stack*13,w:64,h:12}; }
+  return {x:6,y:14+i*26,w:64,h:22}; }
+function binRect(b){ return {x:88+b*50,y:8,w:46,h:104}; }
+const mtC=el("mtCanvas"), mt=mtC.getContext("2d"); mt.imageSmoothingEnabled=false;
+function drawTriage(){
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  for(let b=0;b<3;b++){ const r=binRect(b); mt.fillStyle=P1; mt.fillRect(r.x,r.y,r.w,r.h);
+    mt.fillStyle=P3; mt.fillRect(r.x,r.y,r.w,1);mt.fillRect(r.x,r.y+r.h-1,r.w,1);mt.fillRect(r.x,r.y,1,r.h);mt.fillRect(r.x+r.w-1,r.y,1,r.h);
+    txt(mt,BINS[b],r.x+3,r.y+10,6,P3); }
+  for(let i=0;i<3;i++){ const r=cardRect(i); const placed=tri.place[i]!==null;
+    mt.fillStyle=P3; mt.fillRect(r.x,r.y,r.w,r.h); mt.fillStyle=P0; mt.fillRect(r.x+1,r.y+1,r.w-2,r.h-2);
+    txt(mt,TRIAGE_CARDS[i].short,r.x+3,r.y+(placed?9:13),6,P3);
+    if(!placed) txt(mt,"drag me",r.x+3,r.y+20,5,P2); }
+  if(tri.done){ mt.fillStyle=P3; mt.fillRect(150,126,80,18); txt(mt,"CONFIRM",164,138,7,P0); }
+  else txt(mt,"place all three",6,140,6,P2);
+}
+function finishTriage(){
+  let right=0; const notes=[];
+  tri.place.forEach((b,i)=>{ const c=TRIAGE_CARDS[i];
+    if(b===c.correct){ right++; }
+    else notes.push(c.short+": "+(b>c.correct?"under-triaged — "+c.why:"over-triaged — "+c.why)); });
+  el("mtask").style.display="none";
+  if(right===3) sfx.good(); else sfx.bad();
+  const lines=[right===3?"All three correct. You saw the quiet one.":right+" of 3."];
+  if(notes.length) lines.push(notes.join("  ·  "));
+  openDialogue("TRIAGE",lines,null,()=>finishTrial("med","micro",right/3));
+}
+
+/* --- MED deep: night shift (movement, real time) --- */
+TASKS.med_deep={ title:"NIGHT SHIFT", brief:"Four patients, one of you. Stability drops on its own — walk over and press SPACE to stabilize. You cannot be everywhere. Keep who you can until morning.",
+  init(){ const beds=[{x:-64,y:-44},{x:64,y:-44},{x:-64,y:20},{x:64,y:20}];
+    G.interior.t.timer=44; G.interior.t.beds=[];
+    beds.forEach((b,i)=>{ const st={lvl:74,lost:false,cd:0}; addStation("bed",b.x,b.y,"BED "+(i+1),st); G.interior.t.beds.push(st); }); },
+  onStation(s){ if(s.sub!=="bed")return; const st=s.st;
+    if(st.lost){ openDialogue("BED",["You couldn't get back to them in time."]); return; }
+    if(st.cd>0)return; st.lvl=Math.min(100,st.lvl+40); st.cd=0.5; sfx.heal(); },
+  update(dt){ const T=G.interior.t; if(G.interior.phase!=="active")return; const s=dt/1000; T.timer-=s;
+    for(const b of T.beds){ if(b.lost)continue; b.cd=Math.max(0,b.cd-s); b.lvl-=2.4*s; if(b.lvl<=0){b.lvl=0;b.lost=true;sfx.crash();} }
+    const alive=T.beds.filter(b=>!b.lost).length;
+    el("taskHud").textContent="SHIFT "+Math.max(0,Math.ceil(T.timer))+"s  ·  STABLE "+alive+"/4";
+    if(T.timer<=0){ finishTrial("med","deep",alive/4, alive===4?"You held the line — all four made it to morning."
+      :(alive===0?"You could not reach them. No one person could have. That truth does not make it lighter."
+      :"You kept "+alive+" of 4 stable. Some nights the math is just bigger than you.")); } } };
+
+/* --- BUILD micro: TYPE the fix --- */
+TASKS.build_micro={ title:"MAKE IT RUN", brief:"It won't compile. Read the error, then retype the broken line correctly. You'll type real code — close counts, exact isn't required.",
+  init(){ addStation("terminal",0,-30,"TERMINAL",{}); }, onStation(){ openType(0); } };
+const TYPE_BUGS=[
+  {err:"SyntaxError: unexpected token '=!'", broken:"if (user =! null) {",
+   test:s=>/(!==|!=)/.test(s)&&/user/.test(s)&&/null/.test(s), fix:"if (user !== null) {", why:"`=!` isn't an operator. You meant `!==`."},
+  {err:"TypeError: btn.onclik is not a function", broken:"btn.onclik = submit;",
+   test:s=>/onclick/i.test(s)&&/submit/.test(s), fix:"btn.onclick = submit;", why:"A typo the compiler never catches — it just silently never fires."},
+  {err:"RangeError: index out of bounds", broken:"for (let i = 0; i <= arr.length; i++) {",
+   test:s=>/<\s*arr\.length/.test(s)&&!/<=/.test(s), fix:"for (let i = 0; i < arr.length; i++) {", why:"Classic off-by-one — `<=` runs one past the end."}
+];
+const ttC=el("ttCanvas"), tt=ttC.getContext("2d"); tt.imageSmoothingEnabled=false;
+let typeIdx=0, typeTries=0;
+function openType(i){ typeIdx=i; typeTries=0; el("ttask").style.display="flex";
+  el("ttTitle").textContent="MAKE IT RUN — bug "+(i+1)+"/3";
+  el("codeIn").value=TYPE_BUGS[i].broken; drawType(""); setTimeout(()=>{el("codeIn").focus(); el("codeIn").select();},60); }
+function drawType(msg){
+  const b=TYPE_BUGS[typeIdx];
+  tt.fillStyle=P3; tt.fillRect(0,0,236,120);
+  txt(tt,"$ npm run build",8,16,7,P0);
+  wrapTxt(tt,b.err,8,32,7,30,11,P1);
+  txt(tt,"broken line:",8,58,6,P1);
+  tt.fillStyle=P2; tt.fillRect(6,64,224,16); txt(tt,b.broken.slice(0,30),10,75,7,P0);
+  if(msg) wrapTxt(tt,msg,8,96,6,34,10,P0);
+  else txt(tt,typeTries>=2?("hint: "+b.fix.slice(0,28)):"retype it correctly below",8,100,6,P1);
+}
+el("codeGo").onclick=()=>submitCode();
+el("codeIn").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submitCode(); } });
+function submitCode(){
+  const b=TYPE_BUGS[typeIdx], v=el("codeIn").value.trim();
+  if(b.test(v)){ sfx.good(); drawType("compiles. "+b.why);
+    setTimeout(()=>{ if(typeIdx<TYPE_BUGS.length-1){ openType(typeIdx+1); }
+      else { el("ttask").style.display="none"; finishTrial("build","micro",1); } },1100);
+  } else { typeTries++; sfx.bad(); drawType("still red. look at the operator."); }
+}
+
+/* --- BUILD deep: ship under the clock --- */
+TASKS.build_deep={ title:"SHIP THE DEMO", brief:"Demo in under a minute. Three bugs are live. Fix what you can, then hit SHIP — and if the clock runs out you ship it broken, because done beats perfect.",
+  init(){ G.interior.t.timer=54; G.interior.t.fixed=[false,false,false];
+    [{x:-64,y:-42},{x:64,y:-42},{x:0,y:-56}].forEach((p,i)=>addStation("bug",p.x,p.y,"BUG "+(i+1),{i,red:true}));
+    addStation("ship",0,22,"SHIP",{ship:true}); },
+  onStation(s){ const T=G.interior.t;
+    if(s.sub==="bug"){ if(T.fixed[s.st.i]){ openDialogue("BUG",["Already green. Go hit SHIP."]); return; } bugFix(s); }
+    else { const n=T.fixed.filter(Boolean).length;
+      if(n<3) openDialogue("SHIP",[(3-n)+" still broken. Ship anyway?"],[
+        {label:"No — keep fixing",onPick:()=>closeDialogue()},
+        {label:"Ship it broken",onPick:()=>{ closeDialogue(); finishTrial("build","deep",0.5,"You shipped it broken and the room clapped anyway. Momentum over polish — that's the culture."); }}]);
+      else finishTrial("build","deep",1,"Clean, with time to spare. For a second the thing you made just... worked."); } },
+  update(dt){ const T=G.interior.t; if(G.interior.phase!=="active")return; T.timer-=dt/1000;
+    el("taskHud").textContent="DEMO IN "+Math.max(0,Math.ceil(T.timer))+"s  ·  FIXED "+T.fixed.filter(Boolean).length+"/3";
+    if(T.timer<=0) finishTrial("build","deep",0.35,"Time's up — you ship what you have. It half-works on stage and nobody minds."); } };
+const BUG_FIX=[
+  {q:"Null crash on load.",opts:["Add a null check before use","Delete the feature","Wrap it all in try/catch"],correct:0},
+  {q:"Layout breaks on mobile.",opts:["Ignore mobile","Add a responsive breakpoint","Hardcode 1920px"],correct:1},
+  {q:"API call times out.",opts:["Retry with timeout + fallback","Call it ten more times","Remove the spinner"],correct:0}
+];
+function bugFix(s){ const r=BUG_FIX[s.st.i];
+  openDialogue("BUG "+(s.st.i+1),[r.q],r.opts.map((o,idx)=>({label:o,onPick:()=>{
+    if(idx===r.correct){ sfx.good(); G.interior.t.fixed[s.st.i]=true; s.st.red=false; s.st.fixed=true; openDialogue("BUG",["Green. Next."]); }
+    else { sfx.bad(); openDialogue("BUG",["That makes it worse."]); } }}))); }
+
+/* --- SOUND micro: mouse step sequencer --- */
+TASKS.sound_micro={ title:"MAKE A BEAT", brief:"Program a groove: kick on the 1, snare on the backbeat, hats to drive it. Click the grid to place hits.",
+  init(){ addStation("desk",0,-30,"DESK",{}); }, onStation(){ openSeq(); } };
+let seq={g:[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]],playing:false,ph:0,timer:null};
+function seqCell(r,c){ return {x:24+c*24,y:22+r*30,w:20,h:24}; }
+function openSeq(){
+  seq.g=[[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0]]; seq.playing=false; seq.ph=0;
+  el("mtTitle").textContent="MAKE A BEAT"; el("mtHint").textContent="click cells to place hits · PLAY to hear it · LOCK when it grooves";
+  el("mtask").style.display="flex";
+  bindPointer(mtC,{ down:p=>{
+    for(let r=0;r<3;r++) for(let c=0;c<8;c++) if(hit(p,seqCell(r,c))){ seq.g[r][c]^=1;
+      if(seq.g[r][c]){ r===0?sfx.kick():r===1?sfx.snare():sfx.hat(); } drawSeq(); return; }
+    if(hit(p,{x:24,y:122,w:52,h:18})){ seq.playing?seqStop():seqStart(); drawSeq(); return; }
+    if(hit(p,{x:150,y:122,w:60,h:18})) seqLock();
+  }});
+  drawSeq();
+}
+function drawSeq(){
+  const names=["KICK","SNARE","HAT"];
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  for(let r=0;r<3;r++){ txt(mt,names[r],2,seqCell(r,0).y+16,5,P3);
+    for(let c=0;c<8;c++){ const q=seqCell(r,c);
+      mt.fillStyle=P3; mt.fillRect(q.x,q.y,q.w,q.h);
+      mt.fillStyle=seq.g[r][c]?P3:P0; mt.fillRect(q.x+1,q.y+1,q.w-2,q.h-2);
+      if(seq.g[r][c]){ mt.fillStyle=P0; mt.fillRect(q.x+7,q.y+9,6,6); }
+      if(c%4===0){ mt.fillStyle=P2; mt.fillRect(q.x,q.y-3,q.w,2); }
+      if(seq.playing&&c===seq.ph){ mt.fillStyle=P2; mt.fillRect(q.x,q.y-3,q.w,2); } } }
+  mt.fillStyle=P3; mt.fillRect(24,122,52,18); txt(mt,seq.playing?"STOP":"PLAY",34,134,7,P0);
+  const ok=seqOK(); mt.fillStyle=ok?P3:P1; mt.fillRect(150,122,60,18); txt(mt,"LOCK",166,134,7,ok?P0:P2);
+}
+function seqStep(){ for(let r=0;r<3;r++) if(seq.g[r][seq.ph]){ r===0?sfx.kick():r===1?sfx.snare():sfx.hat(); }
+  seq.ph=(seq.ph+1)%8; drawSeq(); }
+function seqStart(){ if(seq.playing)return; seq.playing=true; seq.ph=0; seq.timer=setInterval(seqStep,145); }
+function seqStop(){ seq.playing=false; if(seq.timer)clearInterval(seq.timer); seq.timer=null; }
+function seqOK(){ return seq.g[0][0]&&seq.g[1][4]&&seq.g[2].reduce((a,b)=>a+b,0)>=3; }
+function seqLock(){ if(!seqOK()){ sfx.deny(); el("mtHint").textContent="not a groove yet — kick on 1, snare on 5, at least three hats"; return; }
+  seqStop(); el("mtask").style.display="none"; sfx.confirm(); finishTrial("sound","micro",1); }
+
+/* --- SOUND deep: draggable mixer --- */
+TASKS.sound_deep={ title:"GET IT TO SIT", brief:"The parts are there; now make them sit in the pocket. Kick out front, snare just under it, hats underneath without poking out. Drag the faders.",
+  init(){ addStation("console",0,-30,"CONSOLE",{}); }, onStation(){ openMix(); } };
+let mix={lv:[34,34,62],drag:null};
+const MIX_T=[[64,90],[44,68],[24,48]], MIX_N=["KICK","SNARE","HAT"];
+function faderRect(i){ return {x:34+i*58,y:16,w:30,h:92}; }
+function openMix(){ mix={lv:[34,34,62],drag:null};
+  el("mtTitle").textContent="GET IT TO SIT"; el("mtHint").textContent="drag faders · PLAY to hear · the shaded band is where each part sits";
+  el("mtask").style.display="flex";
+  bindPointer(mtC,{
+    down:p=>{ for(let i=0;i<3;i++) if(hit(p,faderRect(i))){ mix.drag=i; setFader(p); return; }
+      if(hit(p,{x:24,y:122,w:52,h:18})){ mixPlay(); return; }
+      if(hit(p,{x:150,y:122,w:60,h:18})) mixDone(); },
+    move:p=>{ if(mix.drag!=null) setFader(p); },
+    up:()=>{ mix.drag=null; } });
+  drawMix();
+}
+function setFader(p){ const r=faderRect(mix.drag); let v=100-((p.y-r.y)/r.h*100);
+  mix.lv[mix.drag]=Math.max(0,Math.min(100,Math.round(v))); drawMix(); }
+function mixOK(){ return mix.lv.every((v,i)=>v>=MIX_T[i][0]&&v<=MIX_T[i][1]); }
+function mixPlay(){ const v=mix.lv; blip(95,0.16,"sine",0.10*v[0]/100,55);
+  setTimeout(()=>noiseHit(0.03,0.05*v[2]/100),80); setTimeout(()=>{noiseHit(0.08,0.06*v[1]/100);blip(180,0.06,"triangle",0.03*v[1]/100);},160);
+  setTimeout(()=>noiseHit(0.03,0.05*v[2]/100),240); }
+function drawMix(){
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  for(let i=0;i<3;i++){ const r=faderRect(i);
+    mt.fillStyle=P3; mt.fillRect(r.x-1,r.y-1,r.w+2,r.h+2); mt.fillStyle=P0; mt.fillRect(r.x,r.y,r.w,r.h);
+    const t=MIX_T[i], py=r.y+r.h-(t[1]/100*r.h), ph=(t[1]-t[0])/100*r.h;
+    mt.fillStyle=P1; mt.fillRect(r.x,py,r.w,ph);
+    const lh=mix.lv[i]/100*r.h; mt.fillStyle=P2; mt.fillRect(r.x,r.y+r.h-lh,r.w,lh);
+    mt.fillStyle=P3; mt.fillRect(r.x-3,r.y+r.h-lh-2,r.w+6,4);
+    txt(mt,MIX_N[i],r.x-2,r.y+r.h+12,6,P3); }
+  mt.fillStyle=P3; mt.fillRect(24,122,52,18); txt(mt,"PLAY",36,134,7,P0);
+  const ok=mixOK(); mt.fillStyle=ok?P3:P1; mt.fillRect(150,122,60,18); txt(mt,ok?"IT SITS":"...",160,134,7,ok?P0:P2);
+}
+function mixDone(){ if(!mixOK()){ sfx.deny(); return; } el("mtask").style.display="none"; sfx.confirm(); finishTrial("sound","deep",1); }
+
+/* --- RESEARCH micro: drag ONE variable --- */
+TASKS.research_micro={ title:"IT WON'T REPLICATE", brief:"Your blot keeps failing. Drag exactly ONE variable onto the protocol and run it. Change two at once and you learn nothing.",
+  init(){ addStation("bench",0,-30,"BENCH",{}); }, onStation(){ openRepl(); } };
+const REPL=[
+  {sym:"Run 1: no bands at all. Blank membrane.",right:"antibody",why:"No signal → the primary antibody was too dilute."},
+  {sym:"Run 2: bands appear, but the whole blot is gray fog.",right:"blocking",why:"High background → the blocking buffer."},
+  {sym:"Run 3: clean bands, but only on half the membrane.",right:"transfer",why:"Uneven signal → the transfer step."}
+];
+const VARS=[{k:"antibody",n:"Antibody conc."},{k:"blocking",n:"Blocking buffer"},{k:"transfer",n:"Transfer time"},{k:"wash",n:"Wash steps"}];
+let rep={step:0,slot:[],drag:null,pos:null};
+function varRect(i){ return {x:8,y:34+i*26,w:88,h:20}; }
+function slotRect(){ return {x:126,y:52,w:96,h:34}; }
+function openRepl(){ rep={step:0,slot:[],drag:null,pos:null};
+  el("mtTitle").textContent="IT WON'T REPLICATE"; el("mtHint").textContent="drag ONE variable into the protocol slot, then RUN";
+  el("mtask").style.display="flex";
+  bindPointer(mtC,{
+    down:p=>{ for(let i=0;i<VARS.length;i++) if(hit(p,varRect(i))){ rep.drag=i; rep.pos={x:p.x-44,y:p.y-10}; sfx.pick(); drawRepl(); return; }
+      if(hit(p,{x:150,y:120,w:60,h:20})) runRepl(); },
+    move:p=>{ if(rep.drag!=null){ rep.pos={x:p.x-44,y:p.y-10}; drawRepl(); } },
+    up:p=>{ if(rep.drag==null)return;
+      if(hit(p,slotRect())){ if(!rep.slot.includes(rep.drag)) rep.slot.push(rep.drag); sfx.drop(); }
+      rep.drag=null; rep.pos=null; drawRepl(); } });
+  drawRepl();
+}
+function drawRepl(){
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  wrapTxt(mt,REPL[rep.step].sym,8,12,6,38,9,P3);
+  for(let i=0;i<VARS.length;i++){ if(rep.drag===i)continue; const r=varRect(i); const used=rep.slot.includes(i);
+    mt.fillStyle=P3; mt.fillRect(r.x,r.y,r.w,r.h); mt.fillStyle=used?P1:P0; mt.fillRect(r.x+1,r.y+1,r.w-2,r.h-2);
+    txt(mt,VARS[i].n,r.x+4,r.y+13,6,P3); }
+  const s=slotRect(); mt.fillStyle=rep.slot.length>1?P2:P1; mt.fillRect(s.x,s.y,s.w,s.h);
+  mt.fillStyle=P3; mt.fillRect(s.x,s.y,s.w,1);mt.fillRect(s.x,s.y+s.h-1,s.w,1);mt.fillRect(s.x,s.y,1,s.h);mt.fillRect(s.x+s.w-1,s.y,1,s.h);
+  txt(mt,"PROTOCOL",s.x+4,s.y-4,6,P3);
+  if(rep.slot.length===0) txt(mt,"drop one here",s.x+6,s.y+20,6,P2);
+  else rep.slot.forEach((v,i)=>txt(mt,VARS[v].n,s.x+5,s.y+14+i*12,6,P3));
+  if(rep.slot.length>1) txt(mt,"two at once = no answer",8,146,5,P3);
+  if(rep.drag!=null&&rep.pos){ mt.fillStyle=P3; mt.fillRect(rep.pos.x,rep.pos.y,88,20); mt.fillStyle=P0; mt.fillRect(rep.pos.x+1,rep.pos.y+1,86,18);
+    txt(mt,VARS[rep.drag].n,rep.pos.x+4,rep.pos.y+13,6,P3); }
+  mt.fillStyle=rep.slot.length===1?P3:P1; mt.fillRect(150,120,60,20); txt(mt,"RUN",168,133,7,rep.slot.length===1?P0:P2);
+}
+function runRepl(){
+  if(rep.slot.length!==1){ sfx.deny();
+    if(rep.slot.length>1){ el("mtask").style.display="none";
+      openDialogue("BENCH",["You changed two things at once. It worked — and you have no idea which one did it. Reset."],null,()=>{ rep.slot=[]; el("mtask").style.display="flex"; drawRepl(); }); }
+    return; }
+  const chosen=VARS[rep.slot[0]].k, r=REPL[rep.step];
+  if(chosen===r.right){ sfx.good(); el("mtask").style.display="none";
+    openDialogue("BENCH",[r.why],null,()=>{
+      if(rep.step<REPL.length-1){ rep.step++; rep.slot=[]; el("mtask").style.display="flex"; drawRepl(); }
+      else finishTrial("research","micro",1,"It replicates — clean, three runs straight. One variable at a time, all semester."); });
+  } else { sfx.bad(); el("mtask").style.display="none";
+    openDialogue("BENCH",["No change. Not that one — but at least you know that cleanly. Try another."],null,()=>{ rep.slot=[]; el("mtask").style.display="flex"; drawRepl(); }); }
+}
+
+/* --- RESEARCH deep: accumulate trials --- */
+TASKS.research_deep={ title:"THE LONG QUESTION", brief:"One question, into the dark. Each trial is noisy. A real signal only appears after many runs — and you can't publish before it does.",
+  init(){ addStation("bench",0,-30,"BENCH",{}); }, onStation(){ openAcc(); } };
+let acc={runs:[]};
+function openAcc(){ acc.runs=[];
+  el("mtTitle").textContent="THE LONG QUESTION"; el("mtHint").textContent="click RUN TRIAL · publish only when a signal separates from the noise";
+  el("mtask").style.display="flex";
+  bindPointer(mtC,{ down:p=>{ if(hit(p,{x:16,y:120,w:80,h:20})) runTrial();
+    if(hit(p,{x:140,y:120,w:80,h:20})) publish(); } });
+  drawAcc();
+}
+function runTrial(){ if(acc.runs.length>=26){sfx.deny();return;}
+  acc.runs.push(Math.max(2,Math.min(98,58+(Math.random()-0.5)*72))); sfx.select(); drawAcc(); }
+function drawAcc(){
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  mt.fillStyle=P3; mt.fillRect(20,10,192,100); mt.fillStyle=P0; mt.fillRect(21,11,190,98);
+  acc.runs.forEach((v,i)=>{ const x=22+(i/26)*186, y=109-(v/100*96); mt.fillStyle=P2; mt.fillRect(x,y,3,3); });
+  const ready=acc.runs.length>=14;
+  if(ready){ const avg=acc.runs.reduce((a,b)=>a+b,0)/acc.runs.length, y=109-(avg/100*96);
+    mt.fillStyle=P3; for(let x=22;x<210;x+=5) mt.fillRect(x,y,3,1); txt(mt,"signal",176,22,6,P3); }
+  txt(mt,"trials: "+acc.runs.length,22,124,6,P3);
+  mt.fillStyle=P3; mt.fillRect(16,128,90,18); txt(mt,"RUN TRIAL",26,140,6,P0);
+  mt.fillStyle=ready?P3:P1; mt.fillRect(140,128,80,18); txt(mt,"PUBLISH",152,140,6,ready?P0:P2);
+}
+function publish(){ if(acc.runs.length<14){ sfx.deny(); el("mtHint").textContent="inconclusive — the noise is still bigger than the signal"; return; }
+  el("mtask").style.display="none"; sfx.confirm(); finishTrial("research","deep",1); }
+
+/* ================= ACT II TASK: the real job ================= */
+let alloc={tokens:[],drag:null,pos:null,placed:[0,0,0,0]};
+function openAlloc(){
+  const P=PATHS[G.committed];
+  alloc={drag:null,pos:null,placed:[0,0,0,0],left:8};
+  el("mtTitle").textContent="A WEEK IN THE JOB";
+  el("mtHint").textContent="drag your 8 units of time onto what matters · there are not enough";
+  el("mtask").style.display="flex";
+  bindPointer(mtC,{
+    down:p=>{ if(hit(p,poolRect())&&alloc.left>0){ alloc.drag=1; alloc.pos={x:p.x-7,y:p.y-7}; sfx.pick(); drawAlloc(); return; }
+      for(let i=0;i<4;i++) if(hit(p,demandRect(i))&&alloc.placed[i]>0){ alloc.placed[i]--; alloc.left++; sfx.select(); drawAlloc(); return; }
+      if(alloc.left===0&&hit(p,{x:150,y:130,w:80,h:16})) endWeek(); },
+    move:p=>{ if(alloc.drag){ alloc.pos={x:p.x-7,y:p.y-7}; drawAlloc(); } },
+    up:p=>{ if(!alloc.drag)return;
+      for(let i=0;i<4;i++) if(hit(p,demandRect(i))){ alloc.placed[i]++; alloc.left--; sfx.drop(); break; }
+      alloc.drag=null; alloc.pos=null; drawAlloc(); } });
+  drawAlloc();
+}
+function poolRect(){ return {x:8,y:112,w:120,h:26}; }
+function demandRect(i){ return {x:8+(i%2)*116,y:22+Math.floor(i/2)*44,w:110,h:38}; }
+function drawAlloc(){
+  const P=PATHS[G.committed];
+  mt.fillStyle=P0; mt.fillRect(0,0,236,150);
+  txt(mt,"YOUR WEEK — "+P.role.toUpperCase(),8,12,6,P3);
+  for(let i=0;i<4;i++){ const r=demandRect(i);
+    mt.fillStyle=P3; mt.fillRect(r.x,r.y,r.w,r.h); mt.fillStyle=P0; mt.fillRect(r.x+1,r.y+1,r.w-2,r.h-2);
+    wrapTxt(mt,P.demands[i],r.x+4,r.y+11,5,22,8,P3);
+    for(let k=0;k<alloc.placed[i];k++){ mt.fillStyle=P3; mt.fillRect(r.x+5+k*11,r.y+26,8,8); } }
+  const pr=poolRect(); txt(mt,"unspent time: "+alloc.left,pr.x,pr.y-4,6,P3);
+  for(let k=0;k<alloc.left;k++){ mt.fillStyle=P2; mt.fillRect(pr.x+k*13,pr.y+6,10,10); }
+  if(alloc.drag&&alloc.pos){ mt.fillStyle=P3; mt.fillRect(alloc.pos.x,alloc.pos.y,10,10); }
+  if(alloc.left===0){ mt.fillStyle=P3; mt.fillRect(150,130,80,16); txt(mt,"END WEEK",160,141,6,P0); }
+  else txt(mt,"place every unit",150,141,5,P2);
+}
+function endWeek(){
+  const P=PATHS[G.committed], p=alloc.placed;
+  el("mtask").style.display="none";
+  const lines=[];
+  if(p[3]===0) lines.push("You gave nothing to sleep or the people who love you. It worked this week. It does not work for many weeks.");
+  else if(p[3]>=3) lines.push("You protected your life outside the work. Some of the job slipped, and you are still here to do it next week.");
+  else lines.push("You kept a little back for yourself. Not much. Enough to keep going.");
+  const maxI=p.indexOf(Math.max(...p));
+  lines.push("Most of your week went to "+P.demands[maxI].toLowerCase()+". That is what this job actually is, most weeks — not the part they show you.");
+  lines.push("Years pass like this.");
+  sfx.confirm();
+  openDialogue("THE JOB",lines,null,()=>{ G.years+=4; G.careerStage=1; G.journey.push({t:"work",label:"Worked as a "+P.role}); 
+    fadeTo(()=>{ buildCareer(); ensureLabels(); showIntro("A CROSSROADS",
+      "Four years in. You're good at this now — and three doors just opened. Go deeper into a specialty, go sideways into something new, or stay where you are. All three are real lives. Walk to one."); }); });
+}
+
+/* ================= FINISH A TRIAL ================= */
+function finishTrial(path,mode,quality,extraLine){
+  if(G.interior){ if(G.interior.phase==="done")return; G.interior.phase="done"; }
+  const rungIdx=mode==="micro"?1:2, P=PATHS[path], rd=P.rungs[rungIdx];
+  G.inventory.push({path,rung:rungIdx,name:rd.item,desc:rd.desc,kind:"keepsake"});
+  G.pathState[path].rung=rungIdx+1;
+  if(mode==="deep") addSkill(P.skill);
+  const lines=[]; if(extraLine)lines.push(extraLine); lines.push(rd.desc); lines.push("Acquired: "+rd.item+".");
+  if(mode==="deep") lines.push("You're carrying something now: "+P.skill.label+".");
+  fadeTo(()=>{ buildPlaza(path); ensureLabels(); openDialogue(P.name,lines); });
+}
+
+/* ================= CAMERA + WORLD RENDER ================= */
+function updateCam(){ G.cam.x=G.player.x-(VW/2-HALF); G.cam.y=G.player.y-(VH/2-HALF); }
+const R=v=>Math.round(v); function wx(x){return R(x-G.cam.x);} function wy(y){return R(y-G.cam.y);}
+function rng(a,b){ let h=(a*73856093 ^ b*19349663)>>>0; h=(h^(h>>13))*1274126177>>>0; return (h>>>0)/4294967295; }
+function drawGrass(){
+  cx.fillStyle=P0; cx.fillRect(0,0,VW,VH);
+  const t=16, tx0=Math.floor(G.cam.x/t)-1, ty0=Math.floor(G.cam.y/t)-1;
+  for(let ty=ty0;ty<ty0+VH/t+2;ty++)for(let tx=tx0;tx<tx0+VW/t+2;tx++){
+    const px=tx*t-G.cam.x, py=ty*t-G.cam.y, r=rng(tx,ty);
+    cx.fillStyle=P1; cx.fillRect(px+3+((r*7)|0),py+10,1,3); cx.fillRect(px+9,py+6+((r*5)|0),1,2);
+    if(r>0.72){ cx.fillStyle=P2; cx.fillRect(px+12,py+12,1,2); }
+    if(r>0.94){ cx.fillStyle=P2; cx.fillRect(px+6,py+4,3,1);cx.fillRect(px+7,py+3,1,3); cx.fillStyle=P3; cx.fillRect(px+7,py+4,1,1); }
+  }
+}
+function drawRoad(){
+  const x0=wx(-18), w=36; cx.fillStyle=P1; cx.fillRect(x0,0,w,VH);
+  cx.fillStyle=P2; cx.fillRect(x0,0,2,VH); cx.fillRect(x0+w-2,0,2,VH);
+  const ty0=Math.floor(G.cam.y/8)-1;
+  for(let ty=ty0;ty<ty0+VH/8+2;ty++){ const py=ty*8-G.cam.y, r=rng(7,ty); cx.fillStyle=P2;
+    cx.fillRect(x0+4+((r*24)|0),py+2,2,1); if(r>0.5) cx.fillRect(x0+10+((rng(3,ty)*14)|0),py+5,1,1); }
+}
+function drawInteriorFloor(){
+  const th=THEME[G.interior?G.interior.path:"med"];
+  cx.fillStyle=th.floor; cx.fillRect(0,0,VW,VH);
+  const t=16, tx0=Math.floor(G.cam.x/t)-1, ty0=Math.floor(G.cam.y/t)-1;
+  cx.fillStyle=th.grid;
+  for(let ty=ty0;ty<ty0+VH/t+2;ty++)for(let tx=tx0;tx<tx0+VW/t+2;tx++){
+    const px=tx*t-G.cam.x, py=ty*t-G.cam.y;
+    if(th.note==="tile"){ cx.fillRect(px+15,py,1,16); cx.fillRect(px,py+15,16,1); }
+    else if(th.note==="concrete"){ if(rng(tx,ty)>0.7) cx.fillRect(px+4,py+6,5,1); }
+    else if(th.note==="carpet"){ cx.fillRect(px+2,py+3,1,1); cx.fillRect(px+9,py+11,1,1); }
+    else { cx.fillRect(px,py+15,16,1); }
+  }
+  cx.fillStyle=th.wall; for(const s of solids) cx.fillRect(wx(s.x),wy(s.y),s.w,s.h);
+  cx.fillStyle=th.trim; for(const s of solids){ cx.fillRect(wx(s.x),wy(s.y),s.w,2); }
+}
+function drawPromptBubble(px,py){ const t=Math.floor(Date.now()/300)%2;
+  cx.fillStyle=P3;cx.fillRect(px-3,py-t,6,6); cx.fillStyle=P0;cx.fillRect(px-1,py+1-t,2,2); cx.fillStyle=P3;cx.fillRect(px-1,py+3-t,2,1); }
+
+/* labels */
+const labelsEl=el("labels"); const L={};
+function ensureLabels(){ labelsEl.innerHTML=""; for(const k in L) delete L[k];
+  const pr=document.createElement("div"); pr.className="label hide"; labelsEl.appendChild(pr); L.__prompt=pr;
+  if(G.scene==="plaza"){ for(const p of LAYOUT){ const l=document.createElement("div"); l.className="label"; l.textContent=PATHS[p.id].name; labelsEl.appendChild(l); L[p.id]=l; } }
+  else if(G.scene==="introRoom"){ const l=document.createElement("div"); l.className="label door"; l.textContent="LIFE"; labelsEl.appendChild(l); L.__door=l; }
+}
+function place(lbl,worldX,worldY){ if(!lbl)return; const sx=wx(worldX), sy=wy(worldY);
+  if(sx<-24||sx>VW+24||sy<-24||sy>VH+24){ lbl.classList.add("hide"); return; }
+  lbl.classList.remove("hide"); lbl.style.left=(sx/VW*100)+"%"; lbl.style.top=(sy/VH*100)+"%"; }
+
+/* ================= INPUT ================= */
+const keys={};
+addEventListener("keydown",e=>{
+  const tag=e.target&&e.target.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA") return;
+  const k=e.key.toLowerCase();
+  if(["w","a","s","d"," ","arrowup","arrowdown","arrowleft","arrowright","escape","b","i"].includes(k)) e.preventDefault();
+  keys[k]=true; if(e.repeat)return; action(k);
+});
+addEventListener("keyup",e=>{ keys[e.key.toLowerCase()]=false; });
+const up=k=>k==="w"||k==="arrowup", down=k=>k==="s"||k==="arrowdown", left=k=>k==="a"||k==="arrowleft", right=k=>k==="d"||k==="arrowright", go=k=>k===" "||k==="enter";
+function action(k){
+  if(el("intro").style.display==="block"){ if(go(k)) closeIntro(); return; }
+  if(el("pause").style.display==="block"){ pauseKey(k); return; }
+  if(el("mtask").style.display==="flex"||el("ttask").style.display==="flex"){ if(k==="escape") openPause(); return; }
+  if(el("detail").style.display==="block"){ if(go(k)||k==="escape") backToBag(); return; }
+  if(el("inventory").style.display==="block"){ bagKey(k); return; }
+  if(dlg.open){ dlgKey(k); return; }
+  if(k==="escape"){ openPause(); return; }
+  if(k==="b"||k==="i"){ openBag(); return; }
+  if(go(k)) interactNearest();
+}
+
+/* ================= DIALOGUE ================= */
+const dlgEl=el("dialogue"),dlgName=el("dlgName"),dlgText=el("dlgText"),dlgCh=el("dlgChoices"),dlgHint=el("dlgHint");
+const dlg={open:false,lines:[],i:0,typing:false,full:"",ti:0,timer:null,choices:null,sel:0,onClose:null};
+function openDialogue(name,lines,choices,onClose){
+  dlg.open=true; dlg.lines=(lines&&lines.length)?lines:[" "]; dlg.i=0; dlg.choices=choices||null; dlg.sel=0; dlg.onClose=onClose||null;
+  dlgEl.style.display="block"; dlgName.textContent=name; dlgCh.innerHTML=""; startLine();
+}
+function startLine(){ dlg.full=dlg.lines[dlg.i]||""; dlg.ti=0; dlg.typing=true; dlgText.textContent=""; dlgCh.innerHTML="";
+  dlgHint.style.display="block"; dlgHint.textContent="▸ space"; clearInterval(dlg.timer);
+  dlg.timer=setInterval(()=>{ dlgText.textContent=dlg.full.slice(0,++dlg.ti);
+    if(dlg.ti%3===0) blip(600,0.008,"square",0.01);
+    if(dlg.ti>=dlg.full.length){ clearInterval(dlg.timer); dlg.typing=false; maybeChoices(); } },22);
+}
+function finishTyping(){ clearInterval(dlg.timer); dlgText.textContent=dlg.full; dlg.typing=false; maybeChoices(); }
+function maybeChoices(){ if(dlg.i===dlg.lines.length-1&&dlg.choices){ renderChoices(); dlgHint.style.display="none"; } }
+function renderChoices(){ dlgCh.innerHTML=""; dlg.choices.forEach((c,i)=>{ const d=document.createElement("div");
+  d.className="ch"+(i===dlg.sel?" sel":"")+(c.disabled?" dis":""); d.textContent=(i===dlg.sel?"▸ ":"  ")+c.label;
+  d.onclick=()=>{ if(c.disabled){sfx.deny();return;} dlg.sel=i; sfx.select(); c.onPick(); }; dlgCh.appendChild(d); }); }
+function dlgKey(k){
+  if(dlg.typing){ if(go(k)) finishTyping(); return; }
+  const atEnd=dlg.i===dlg.lines.length-1;
+  if(atEnd&&dlg.choices){
+    if(up(k)){ dlg.sel=(dlg.sel-1+dlg.choices.length)%dlg.choices.length; sfx.select(); renderChoices(); }
+    else if(down(k)){ dlg.sel=(dlg.sel+1)%dlg.choices.length; sfx.select(); renderChoices(); }
+    else if(go(k)){ const c=dlg.choices[dlg.sel]; if(c.disabled){sfx.deny();return;} sfx.select(); c.onPick(); } return;
+  }
+  if(go(k)){ if(!atEnd){ dlg.i++; startLine(); } else closeDialogue(); }
+}
+function closeDialogue(){ dlg.open=false; dlgEl.style.display="none"; dlgCh.innerHTML=""; const f=dlg.onClose; dlg.onClose=null; if(f)f(); }
+
+/* ================= INTERACTION ================= */
+function inRange(it){ const dx=(G.player.x+8)-it.cx, dy=(G.player.y+12)-it.cy; return dx*dx+dy*dy<34*34; }
+function nearestActive(){ let best=null,bd=1e9;
+  for(const it of interactables){ if(!active(it))continue; if(inRange(it)){ const dx=(G.player.x+8)-it.cx,dy=(G.player.y+12)-it.cy,d=dx*dx+dy*dy; if(d<bd){bd=d;best=it;} } } return best; }
+function interactNearest(){ const it=nearestActive(); if(it) doInteract(it); }
+function doInteract(it){
+  if(it.kind==="vendor") return openVendor(it.path);
+  if(it.kind==="building") return openBuilding(it.path);
+  if(it.kind==="glimpsesign"){ const P=PATHS[it.path]; return openDialogue(P.rungs[0].item,[P.rungs[0].desc]); }
+  if(it.kind==="station") return TASKS[G.interior.key].onStation(it);
+  if(it.kind==="exit") return exitInterior();
+  if(it.kind==="workplace") return openWorkplace();
+  if(it.kind==="crossroad") return chooseCrossroad(it.which);
+}
+function exitInterior(){
+  openDialogue("LEAVE",["Walk out now? The weeks are already spent and the trial's unfinished."],[
+    {label:"Leave anyway",onPick:()=>{ closeDialogue(); const p=G.interior.path; G.interior=null; fadeTo(()=>{ buildPlaza(p); ensureLabels(); }); }},
+    {label:"Stay",onPick:()=>closeDialogue()}]);
+}
+function openVendor(id){
+  const P=PATHS[id],st=G.pathState[id];
+  if(st.rung===0){ const lines=P.pitch.slice(); lines.push("\"A glimpse costs "+COST.glimpse+" weeks. No refunds.\"");
+    openDialogue(P.name,lines,[{label:"Buy Glimpse — "+COST.glimpse+" wks",disabled:G.time<COST.glimpse,onPick:()=>buyGlimpse(id)},
+      {label:"Not now",onPick:()=>closeDialogue()}]);
+  } else if(st.rung<3){
+    const need=st.rung===1?COST.micro:COST.deep;
+    const lines=["\"You've glimpsed it. The real thing is inside the "+P.building.toLowerCase()+".\""];
+    lines.push(G.time<need
+      ? "\"You're low on weeks now. You can still start here — you'd just be starting on less. Most people do.\""
+      : "\"Go do the work. Or start here now, if you already know.\"");
+    openDialogue(P.name,lines,[
+      {label:"Start here anyway",onPick:()=>commitPath(id)},
+      {label:"Not yet",onPick:()=>closeDialogue()}]);
+  } else { openDialogue(P.name,["\"You've done the trials here.\"","\"Pick somewhere to START. Not somewhere to stay forever — just somewhere to begin.\""],[
+      {label:"Start here",onPick:()=>commitPath(id)},{label:"Not yet",onPick:()=>closeDialogue()}]); }
+}
+function buyGlimpse(id){ if(G.time<COST.glimpse){sfx.deny();return;}
+  G.time-=COST.glimpse; const P=PATHS[id],rd=P.rungs[0];
+  G.inventory.push({path:id,rung:0,name:rd.item,desc:rd.desc,kind:"keepsake"}); G.pathState[id].rung=1; sfx.buy(); updateHUD();
+  openDialogue(P.name,["You spent "+COST.glimpse+" weeks. "+G.time+" left.",
+    "Acquired: "+rd.item+". The "+P.building.toLowerCase()+" opened — that's where the real work is."]);
+}
+function openBuilding(id){
+  const P=PATHS[id],st=G.pathState[id];
+  if(st.rung<1) return openDialogue(P.building,["Locked. Glimpse the path at the stall first."]);
+  if(st.rung>=3) return openDialogue(P.building,["You've done everything here but decide. Talk to the stall."]);
+  const mode=st.rung===1?"micro":"deep", c=st.rung===1?COST.micro:COST.deep;
+  openDialogue(P.building,["\""+TASKS[id+"_"+mode].title+"\" — a real shift.","Costs "+c+" weeks whether or not you finish. Go in?"],[
+    {label:"Enter — "+c+" wks",disabled:G.time<c,onPick:()=>{ if(G.time<c){sfx.deny();return;} G.time-=c; updateHUD(); closeDialogue();
+      fadeTo(()=>{ buildInterior(id,mode); ensureLabels(); }); }},
+    {label:"Not yet",onPick:()=>closeDialogue()}]);
+}
+function commitPath(id){
+  const P=PATHS[id]; G.committed=id; G.act=2; G.careerStage=0;
+  G.inventory.push({path:id,rung:3,name:P.scroll.item,desc:P.scroll.peak,kind:"scroll",sections:P.scroll.sections,weeksLeft:G.time});
+  const explored=Object.keys(G.pathState).filter(k=>G.pathState[k].rung>0).length;
+  G.journey.push({t:"start",label:"Started in "+P.name});
+  sfx.commit();
+  openDialogue(P.name,[
+    "You picked "+P.name+" as a place to start.",
+    "You explored "+explored+" path"+(explored>1?"s":"")+" and had "+G.time+" weeks left when you chose. That's the runway you get to pour in.",
+    "This is a starting point, not a cage. Let's see what it's actually like."
+  ],null,()=>{ fadeTo(()=>{ buildCareer(); ensureLabels();
+    showIntro("ACT II — THE WORK","You're in the field now. The glimpse showed you the good part; the job includes the rest of it. Walk into your workplace."); }); });
+}
+function openWorkplace(){
+  const P=PATHS[G.committed];
+  if(G.careerStage===0) openDialogue(P.building,["A week of the actual job — not the highlight reel.","Go in?"],[
+    {label:"Go in",onPick:()=>{ closeDialogue(); openAlloc(); }},{label:"Not yet",onPick:()=>closeDialogue()}]);
+  else openDialogue(P.building,["You know this place now. The question isn't the work — it's which door you take next."]);
+}
+function chooseCrossroad(which){
+  const P=PATHS[G.committed];
+  if(which==="deeper"){ const sp=SPECIALIZE[G.committed];
+    openDialogue("GO DEEPER",["Specialize: "+sp.name+".","Narrower, deeper, and you keep everything you've built. Four more years."],[
+      {label:"Take it",onPick:()=>{ closeDialogue(); G.years+=4; G.journey.push({t:"deeper",label:"Specialized: "+sp.name});
+        G.ending={kind:"deeper",line:sp.line}; goEnding(); }},
+      {label:"Back",onPick:()=>closeDialogue()}]);
+  } else if(which==="sideways"){
+    const others=Object.keys(PATHS).filter(k=>k!==G.committed);
+    const opts=others.map(k=>({label:PATHS[k].name,onPick:()=>{ closeDialogue(); switchTo(k); }}));
+    opts.push({label:"Back",onPick:()=>closeDialogue()});
+    const carried=G.skills.map(s=>s.label).join(", ")||"everything you learned about how you work";
+    openDialogue("GO SIDEWAYS",["Switching costs you time — a couple of years to get fluent again.",
+      "You do not start at zero. You carry: "+carried+".","Where to?"],opts);
+  } else {
+    openDialogue("STAY HERE",["Stay. Keep doing the work you're already good at, and get better at it slowly.",
+      "Not everyone needs a plot twist. This is a real answer too."],[
+      {label:"Stay",onPick:()=>{ closeDialogue(); G.years+=4; G.journey.push({t:"stay",label:"Stayed and went deep on the craft"});
+        G.ending={kind:"stay",line:"You stopped looking for the next door and got quietly, seriously good."}; goEnding(); }},
+      {label:"Back",onPick:()=>closeDialogue()}]);
+  }
+}
+function switchTo(k){
+  const from=PATHS[G.committed], to=PATHS[k];
+  const bridge=G.skills.length?G.skills.map(s=>s.transfer).join("; "):"the way you learned to work";
+  G.journey.push({t:"switch",label:"Switched from "+from.name+" to "+to.name});
+  G.years+=5; G.committed=k;
+  G.ending={kind:"switch",line:"You moved from "+from.name.toLowerCase()+" into "+to.name.toLowerCase()+", and what carried over was "+bridge+"."};
+  openDialogue("THE SWITCH",[
+    "It cost you two years of feeling like a beginner again.",
+    "But you weren't one. What carried: "+bridge+".",
+    "People do this more often than anyone tells you at nineteen."
+  ],null,()=>goEnding());
+}
+
+/* ================= ENDING ================= */
+function goEnding(){ fadeTo(()=>{ G.scene="ending"; el("hud").style.display="none"; el("taskHud").style.display="none";
+  labelsEl.innerHTML=""; drawEnding(); }); }
+function drawEnding(){
+  cx.fillStyle=P0; cx.fillRect(0,0,VW,VH);
+  txt(cx,"YOUR LINE",10,18,9,P3);
+  // draw a crooked path through the journey
+  const pts=[], n=G.journey.length+1;
+  for(let i=0;i<n;i++){ const x=22+i*(200/Math.max(1,n-1)); const y=120+((i%2)?-26:22)+(i===n-1?-10:0); pts.push({x,y}); }
+  cx.fillStyle=P1;
+  for(let i=0;i<pts.length-1;i++){ const a=pts[i],b=pts[i+1]; const steps=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
+    for(let s=0;s<steps;s+=2){ const t=s/steps; cx.fillRect(R(a.x+(b.x-a.x)*t),R(a.y+(b.y-a.y)*t),2,2); } }
+  cx.fillStyle=P3; pts.forEach(p=>cx.fillRect(R(p.x)-2,R(p.y)-2,5,5));
+  // labels
+  let ly=44;
+  G.journey.forEach((j)=>{ txt(cx,"· "+j.label.slice(0,34),12,ly,6,P2); ly+=11; });
+  txt(cx,"weeks explored: "+(START_TIME-G.time)+"   years worked: "+G.years,12,ly+4,6,P2);
+  // closing
+  const line=G.ending?G.ending.line:"";
+  wrapTxt(cx,line,12,166,6,40,10,P3);
+  wrapTxt(cx,"Your line is not straight. Almost nobody's is. You did not have to know — you only had to start.",12,196,6,42,10,P3);
+  txt(cx,"ESC — play again",160,220,6,P1);
+  applyTint();
+}
+
+/* ================= BAG / PAUSE ================= */
+let bagSel=0;
+function openBag(){ if(anyOverlay())return; bagSel=0; renderBag(); el("inventory").style.display="block"; sfx.select(); }
+function renderBag(){ const grid=el("invGrid"); grid.innerHTML="";
+  for(let i=0;i<12;i++){ const item=G.inventory[i], slot=document.createElement("div");
+    slot.className="slot"+(item?"":" empty")+(i===bagSel&&item?" sel":"");
+    if(item){ const c=document.createElement("canvas");c.width=16;c.height=16;drawIcon(c.getContext("2d"),item.rung);
+      const nm=document.createElement("div");nm.className="nm";nm.textContent=item.name; slot.appendChild(c);slot.appendChild(nm);
+      slot.onclick=()=>{ bagSel=i; openDetail(i); }; }
+    grid.appendChild(slot); } }
+function bagKey(k){ const n=G.inventory.length; if(n===0){ if(k==="b"||k==="i"||k==="escape")closeBag(); return; }
+  if(left(k)){bagSel=(bagSel-1+n)%n;sfx.select();renderBag();} else if(right(k)){bagSel=(bagSel+1)%n;sfx.select();renderBag();}
+  else if(up(k)){bagSel=(bagSel-4+n)%n;sfx.select();renderBag();} else if(down(k)){bagSel=(bagSel+4)%n;sfx.select();renderBag();}
+  else if(go(k)) openDetail(bagSel); else if(k==="b"||k==="i"||k==="escape") closeBag(); }
+function closeBag(){ el("inventory").style.display="none"; sfx.select(); }
+function openDetail(i){ const item=G.inventory[i]; if(!item)return; sfx.select();
+  el("inventory").style.display="none"; el("detail").style.display="block";
+  el("detName").textContent=item.name; el("detDesc").textContent=item.desc; const sc=el("detSections"); sc.innerHTML="";
+  if(item.kind==="scroll"){ if(item.weeksLeft!=null){ const p=document.createElement("p"); p.style.color=P3; p.style.marginTop="10px";
+      p.textContent="You started here with "+item.weeksLeft+" weeks in reserve."; sc.appendChild(p); }
+    for(const key of Object.keys(item.sections)){ const d=document.createElement("div");d.className="sect";
+      const hh=document.createElement("h3");hh.textContent=key;d.appendChild(hh); const ul=document.createElement("ul");
+      item.sections[key].forEach(t=>{const li=document.createElement("li");li.textContent=t;ul.appendChild(li);}); d.appendChild(ul);sc.appendChild(d); } } }
+function backToBag(){ el("detail").style.display="none"; el("inventory").style.display="block"; renderBag(); sfx.select(); }
+let pauseSel=0;
+function openPause(){ pauseSel=0; renderPause(); el("pause").style.display="block"; sfx.select(); }
+function renderPause(){ document.querySelectorAll("#pause .pm").forEach((d,i)=>{ d.classList.toggle("sel",i===pauseSel);
+  d.onclick=()=>{ pauseSel=i; if(i===0){ el("pause").style.display="none"; } else restart(); }; }); }
+function pauseKey(k){ if(up(k)||down(k)){pauseSel=(pauseSel+1)%2;sfx.select();renderPause();}
+  else if(go(k)){ if(pauseSel===0){ el("pause").style.display="none"; sfx.select(); } else restart(); }
+  else if(k==="escape") el("pause").style.display="none"; }
+function restart(){ ["pause","hud","taskHud","mtask","ttask","dialogue","intro","inventory","detail"].forEach(id=>el(id).style.display="none");
+  dlg.open=false; seqStop(); sfx.confirm(); fadeTo(()=>{ G=freshState(); startBuilder(); }); }
+
+/* ================= HUD / INTRO ================= */
+function updateHUD(){ el("hudTime").textContent=(G.act===2?G.years+" yrs":G.time+" wks"); el("hudPhase").textContent=PHASES[phaseIdx()].n; }
+function showIntro(title,body){ el("introTitle").textContent=title; el("introBody").textContent=body; el("intro").style.display="block"; }
+function closeIntro(){ el("intro").style.display="none"; sfx.confirm(); }
+
+/* ================= BUILDER ================= */
+const bCanvas=el("bCanvas"),bcx=bCanvas.getContext("2d"); bcx.imageSmoothingEnabled=false;
+const GENDERS=["man","woman","other"], OUTFITS=[["shorts","t-shirt & shorts"],["dress","dress"]];
+let bIdx={gender:0,outfit:0}, bFrame=0, bAnim=0;
+function renderPreview(){ bcx.fillStyle=P1;bcx.fillRect(0,0,64,64); bcx.save();bcx.translate(8,8);bcx.scale(3,3);
+  drawChar(bcx,0,0,{gender:GENDERS[bIdx.gender],outfit:OUTFITS[bIdx.outfit][0],dir:"down",frame:bFrame}); bcx.restore(); }
+document.querySelectorAll(".arrow").forEach(a=>a.onclick=()=>{ sfx.select();
+  const key=a.dataset.k,d=+a.dataset.d,arr=key==="gender"?GENDERS:OUTFITS;
+  bIdx[key]=(bIdx[key]+d+arr.length)%arr.length; el("vGender").textContent=GENDERS[bIdx.gender];
+  el("vOutfit").textContent=OUTFITS[bIdx.outfit][1]; renderPreview(); });
+el("builderOk").onclick=()=>{ sfx.confirm(); G.avatar={gender:GENDERS[bIdx.gender],outfit:OUTFITS[bIdx.outfit][0]};
+  el("builderWrap").style.display="none";
+  fadeTo(()=>{ buildIntroRoom(); ensureLabels();
+    showIntro("A PIVOTAL POINT","Your life could still become almost anything. Through the LIFE door are a few of those possibilities. Time is finite — you will not get to try it all. But choosing something is not the same as choosing forever."); }); };
+function startBuilder(){ G.scene="builder"; el("builderWrap").style.display="flex";
+  el("vGender").textContent=GENDERS[bIdx.gender]; el("vOutfit").textContent=OUTFITS[bIdx.outfit][1]; renderPreview(); }
+
+/* ================= FADE ================= */
+const fadeEl=el("fade");
+function fadeTo(mid){ fadeEl.classList.add("on"); setTimeout(()=>{ mid(); setTimeout(()=>fadeEl.classList.remove("on"),60); },560); }
+
+/* ================= MOVEMENT ================= */
+function hits(x,y,w,h){ for(const s of solids){ if(x<s.x+s.w&&x+w>s.x&&y<s.y+s.h&&y+h>s.y) return true; } return false; }
+let stepT=0;
+function updatePlayer(dt){
+  if(anyOverlay()||G.scene==="ending"){ G.player.frame=0; return; }
+  let vx=0,vy=0;
+  if(keys["w"]||keys["arrowup"])vy-=1; if(keys["s"]||keys["arrowdown"])vy+=1;
+  if(keys["a"]||keys["arrowleft"])vx-=1; if(keys["d"]||keys["arrowright"])vx+=1;
+  if(vx||vy){
+    if(Math.abs(vx)>Math.abs(vy)) G.player.dir=vx<0?"left":"right"; else G.player.dir=vy<0?"up":"down";
+    const len=Math.hypot(vx,vy)||1, sp=1.4;
+    const nx=G.player.x+vx/len*sp, ny=G.player.y+vy/len*sp, bw=10,bh=8,ox=3,oy=6;
+    if(!hits(nx+ox,G.player.y+oy,bw,bh))G.player.x=nx;
+    if(!hits(G.player.x+ox,ny+oy,bw,bh))G.player.y=ny;
+    G.player.animT+=dt; if(G.player.animT>140){G.player.frame^=1;G.player.animT=0;}
+    stepT+=dt; if(stepT>240){sfx.step();stepT=0;}
+    if(G.scene==="introRoom"&&!G.doorTriggered){ const d=interactables.find(i=>i.door);
+      if(d&&G.player.x+8>d.cx-14&&Math.abs(G.player.y+8-d.cy)<20){ G.doorTriggered=true; sfx.door();
+        fadeTo(()=>{ buildPlaza(); ensureLabels();
+          showIntro("THE PLAZA OF PATHS","Two stalls are just ahead — walk UP the road. Glimpse a path at a stall, then enter its building to actually work a shift of it. You have 120 weeks. Spending them is the point; hoarding them is not."); }); } }
+  } else G.player.frame=0;
+}
+
+/* ================= RENDER ================= */
+function render(){
+  if(G.scene==="ending") return;
+  if(G.scene==="interior"){ renderInterior(); applyTint(); return; }
+  drawGrass(); if(G.scene==="plaza") drawRoad();
+  for(const t of trees) drawTree(wx(t.x),wy(t.y));
+  const list=[];
+  for(const it of interactables){ if(!active(it))continue;
+    if(it.kind==="vendor"){ list.push({y:it.cy,fn:()=>{ const p=LAYOUT.find(l=>l.id===it.path), sc=stallCenter(p);
+      drawStall(wx(sc.x-24),wy(sc.y-24)); const vx=wx(it.x),vy=wy(it.y);
+      drawChar(cx,vx,vy,{gender:"other",outfit:"shorts",dir:"down",frame:0});
+      cx.fillStyle=P3;cx.fillRect(vx+3,vy,10,2);cx.fillRect(vx+5,vy-2,6,2); }}); }
+    else if(it.kind==="building"){ list.push({y:it.cy,fn:()=>{ const bp=buildingPos(LAYOUT.find(l=>l.id===it.path));
+      BUILDING_ART[it.path](wx(bp.x-24),wy(bp.y),G.pathState[it.path].rung); }}); }
+    else if(it.kind==="workplace"){ list.push({y:it.cy,fn:()=>BUILDING_ART[it.path](wx(-24),wy(-24),3)}); }
+    else if(it.kind==="glimpsesign"){ list.push({y:it.cy,fn:()=>drawSign(wx(it.x),wy(it.y),false)}); }
+    else if(it.kind==="crossroad"){ list.push({y:it.cy,fn:()=>drawSign(wx(it.x),wy(it.y),true)}); }
+    else if(it.kind==="door"){ list.push({y:it.cy,fn:()=>drawDoorProp(wx(it.x),wy(it.y))}); }
+  }
+  list.push({y:G.player.y,fn:()=>drawChar(cx,VW/2-HALF,VH/2-HALF,{gender:G.avatar.gender,outfit:G.avatar.outfit,dir:G.player.dir,frame:G.player.frame})});
+  list.sort((a,b)=>a.y-b.y).forEach(o=>o.fn());
+  const near=anyOverlay()?null:nearestActive();
+  if(near) drawPromptBubble(wx(near.cx), wy(near.y)-12);
+  applyTint();
+  if(G.scene==="plaza"){ for(const p of LAYOUT){ const sc=stallCenter(p); place(L[p.id], sc.x, sc.y-24); } }
+  else if(G.scene==="introRoom") place(L.__door,120,-16);
+  if(L.__prompt){ if(near){ L.__prompt.textContent=near.label+" ▸ space"; place(L.__prompt,near.cx,near.y-24); } else L.__prompt.classList.add("hide"); }
+}
+function renderInterior(){
+  drawInteriorFloor();
+  const list=[];
+  for(const it of interactables){
+    if(it.kind==="station") list.push({y:it.cy,fn:()=>drawFurn(it.sub,wx(it.cx),wy(it.cy),it.st)});
+    else if(it.kind==="exit") list.push({y:it.cy,fn:()=>drawDoorProp(wx(it.x),wy(it.y-16))});
+  }
+  list.push({y:G.player.y,fn:()=>drawChar(cx,VW/2-HALF,VH/2-HALF,{gender:G.avatar.gender,outfit:G.avatar.outfit,dir:G.player.dir,frame:G.player.frame})});
+  list.sort((a,b)=>a.y-b.y).forEach(o=>o.fn());
+  const near=anyOverlay()?null:nearestActive();
+  if(near) drawPromptBubble(wx(near.cx), wy(near.y)-14);
+  if(L.__prompt){ if(near){ L.__prompt.textContent=near.label+" ▸ space"; place(L.__prompt,near.cx,near.y-22); } else L.__prompt.classList.add("hide"); }
+}
+
+/* ================= LOOP ================= */
+let last=0;
+function loop(ts){ const dt=Math.min(40,ts-last); last=ts;
+  if(G.scene==="builder"){ bAnim+=dt; if(bAnim>420){bFrame^=1;bAnim=0;renderPreview();} }
+  else if(G.scene==="ending"){ /* static */ }
+  else { updatePlayer(dt);
+    if(G.scene==="interior"&&G.interior&&TASKS[G.interior.key].update&&!anyOverlay()) TASKS[G.interior.key].update(dt);
+    updateCam(); render(); updateHUD(); }
+  requestAnimationFrame(loop);
+}
+startBuilder(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
