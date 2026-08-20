@@ -1,8 +1,8 @@
-# Runway
+# Wanderer
 
 A Game Boy–style browser game about starting somewhere without having it all figured out.
 
-Runway is an interactive design-research prototype exploring how young people navigate
+Wanderer is an interactive design-research prototype exploring how young people navigate
 options paralysis and fear-based decision-making in the transition into open-ended adult
 life. It holds two ideas together:
 
